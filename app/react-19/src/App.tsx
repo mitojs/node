@@ -1,4 +1,3 @@
-import { reactAdd } from '@mono/react'
 import { useState } from 'react'
 import './App.css'
 import reactLogo from './assets/react.svg'
@@ -21,8 +20,6 @@ function App() {
 					count is {count}
 				</button>
 			</div>
-			<div>reactAdd from @mono/react,以下展示 1 + 2 = reactAdd(1, 2)</div>
-			<div>1 + 2 = {reactAdd(1, 2)}</div>
 		</div>
 	)
 }

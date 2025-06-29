@@ -3,5 +3,3 @@ packages:
   - 'packages/*'
   - 'utils/*'
   - 'app/*'
-  - 'e2e'
-  - 'e2e/demos/*'

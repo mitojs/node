@@ -13,7 +13,6 @@
 		"react-dom": "^19.0.0"
 	},
 	"devDependencies": {
-		"@mono/react": "workspace:*",
 		"@types/react": "^19.0.8",
 		"@types/react-dom": "^19.0.3",
 		"@vitejs/plugin-react": "^4.3.4",

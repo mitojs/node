@@ -6,9 +6,7 @@
 	"workspaces": [
 		"packages/*",
 		"utils/*",
-		"app/*",
-		"e2e",
-		"e2e/demos/*"
+		"app/*"
 	],
 	"scripts": {
 		"commit": "git add . && git cz",

@@ -1,4 +1,4 @@
-# @mono/core
+# @mitojs/node
 
 给`@mono`提供一系列的核心类与函数
 
