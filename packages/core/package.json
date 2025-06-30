@@ -4,6 +4,9 @@
 	"description": "@mitojs/node",
 	"author": "cjinhuo",
 	"license": "MIT",
+	"bin": {
+		"mito-node": "dist/index.js"
+	},
 	"main": "src/index.ts",
 	"module": "src/index.ts",
 	"types": "src/index.ts",
@@ -12,7 +15,6 @@
 		"module": "dist/index.esm.js",
 		"types": "dist/index.d.ts"
 	},
-	"type": "module",
 	"files": [
 		"dist"
 	],
@@ -27,9 +29,13 @@
 	},
 	"dependencies": {
 		"@mono/rollup": "workspace:*",
-		"@mono/shared": "workspace:*"
+		"@mono/shared": "workspace:*",
+		"commander": "^14.0.0",
+		"uuid": "^11.1.0",
+		"ws": "^8.18.3"
 	},
 	"devDependencies": {
-		"@mono/tsconfig": "workspace:*"
+		"@mono/tsconfig": "workspace:*",
+		"@types/ws": "^8.18.1"
 	}
 }

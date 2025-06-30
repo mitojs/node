@@ -2,7 +2,8 @@
 	"extends": "@mono/tsconfig",
 	"compilerOptions": {
 		"rootDir": "src",
-		"outDir": "esm"
+		"outDir": "esm",
+		"module": "CommonJS"
 	},
 	"include": ["src/**/*.ts"],
 	"references": [
