@@ -1,108 +1,57 @@
 #!/usr/bin/env node
 import { program } from 'commander'
 import { CLI } from './cli'
+import { COMMAND_CONFIGS, type COMMAND_TYPE } from './constants'
+import type { AllCommandOptions, CommandOptions } from './types/commands'
 
 interface CmdOptions {
 	pid: string
-	port: string
-	alinode: boolean
-	aliyunnest: boolean
-	cmddir: string
-	cmdduration: string
-	cmdfile: string
-	cmdcode: string
+	port?: string
 }
 
-const cmds: { cmd: string; [key: string]: any }[] = []
-
-console.log('123')
+let inputCmd!: AllCommandOptions
 
 program
-	.option('-p, --pid <pid>', 'process id of the target process')
+	.requiredOption('-p, --pid <pid>', 'process id of the target process')
 	.option('--port <port>', 'inspector port of the target process', '9229')
-	.option('--alinode', 'is alinode runtime', false)
-	.option('--aliyunnest', 'is aliyun nest environment', false)
 
-program
-	.command('cpuprofile')
-	.description('get cpuprofile of the target process')
-	.option('-d, --duration <duration>', 'cpuprofile duration', '10000')
-	.action((options) => {
-		cmds.push({
-			cmd: 'cpuprofile',
-			...options,
+// 遍历命令配置数组来创建命令
+COMMAND_CONFIGS.forEach((config) => {
+	const command = program.command(config.command).description(config.description)
+	// 添加命令选项
+	if (config.options) {
+		config.options.forEach((option) => {
+			if (option.defaultValue) {
+				command.option(option.flags, option.description, option.defaultValue)
+			} else {
+				command.option(option.flags, option.description)
+			}
 		})
-	})
+	}
 
-program
-	.command('heapsnapshot')
-	.description('get heapsnapshot of the target process')
-	.option('-d, --dir <dir>', 'heapsnapshot file store dir', process.cwd())
-	.action((options) => {
-		cmds.push({
-			cmd: 'heapsnapshot',
-			...options,
-		})
+	// 添加命令动作
+	command.action((options) => {
+		inputCmd = {
+			commandType: config.command,
+			options,
+		}
 	})
-
-program
-	.command('report')
-	.description('get report of the target process')
-	.option('-d, --dir <dir>', 'report file store dir', process.cwd())
-	.action((options) => {
-		cmds.push({
-			cmd: 'report',
-			...options,
-		})
-	})
-
-program
-	.command('memory')
-	.description('get memory info of the target process')
-	.action(() => {
-		cmds.push({
-			cmd: 'memory',
-		})
-	})
-
-program
-	.command('startInspect')
-	.description('start inspect the target process')
-	.action(() => {
-		cmds.push({
-			cmd: 'startInspect',
-		})
-	})
-
-program
-	.command('stopInspect')
-	.description('stop inspect the target process')
-	.action(() => {
-		cmds.push({
-			cmd: 'stopInspect',
-		})
-	})
-
-program
-	.command('runCode')
-	.description('run code in the target process')
-	.option('-f, --file <code>', 'run code from file')
-	.option('-c, --code <code>', 'run code from string')
-	.action((options) => {
-		cmds.push({
-			cmd: 'runCode',
-			...options,
-		})
-	})
+})
 
 program.parse(process.argv)
+console.log('process.argv', process.argv)
 
 const options = program.opts<CmdOptions>()
 
+console.log('options', options, inputCmd)
+// todo 检测 pid 是否存在
+// todo 检测 port 是否被占用，检测 port 是否是 NaN，用默认 port
+
+// 无需判断 inputCmd 是否存在，program.parse 会自动处理
 const cli = new CLI({
 	pid: Number(options.pid),
 	port: Number(options.port),
-	cmds,
+	cmd: inputCmd,
 })
 
 cli.run()

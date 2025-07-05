@@ -17,12 +17,6 @@ export function genFilename(ext) {
 	return `${tmpdirPath}/${uuidv4()}.${ext}`
 }
 
-export enum CHROME_DEV_TASK_TYPE {
-	CPU_PROFILE = 'cpu.cpuprofile',
-	HEAP_PROFILE = 'cpu.heapprofile',
-	HEAP_SNAPSHOT = 'heapsnapshot.heapsnapshot',
-}
-
 export function getDevToolsUrl({ filename, dest }) {
 	const fetchPrefix = encodeURIComponent(`https://${HOST}/api_nodejs/functions/tos-proxy?gunzip=1&key=`)
 
@@ -37,3 +31,19 @@ export async function upload(filename: string) {
 		url: filename,
 	}
 }
+
+export const FUNCTION_WRAPPER = (code: string) => `(async function() {
+        try {
+            const data = await (async function() {
+                ${code}
+            })();
+            const ret = { code: 0 };
+            if (data) {
+                ret.data = data;
+            }
+            return JSON.stringify(ret);
+        } catch (e) {
+            return JSON.stringify({code : -1, message: e.message});
+        }
+    })();
+    `

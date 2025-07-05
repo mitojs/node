@@ -1,18 +1,11 @@
-import * as assert from 'node:assert'
 import * as fs from 'node:fs'
 import * as http from 'node:http'
 import * as net from 'node:net'
-// import * as path from 'node:path'
 import { EventEmitter } from 'events'
-// import { v4 as uuidv4 } from 'uuid'
 import WebSocket from 'ws'
-import { CHROME_DEV_TASK_TYPE, genFilename, getDevToolsUrl, upload } from './helper'
-
-export interface CLIOptions {
-	pid: number
-	port: number
-	cmds: any[]
-}
+import { CHROME_DEV_TASK_TYPE, COMMAND_TYPE } from './constants'
+import { FUNCTION_WRAPPER, genFilename, getDevToolsUrl, upload } from './helper'
+import type { CLIRuntimeOptions, CommandOptions } from './types'
 
 interface InspectorInfo {
 	description: string
@@ -24,33 +17,14 @@ interface InspectorInfo {
 	webSocketDebuggerUrl: string
 }
 
-const FUNCTION_WRAPPER = (code: string) => `(async function() {
-        try {
-            const data = await (async function() {
-                ${code}
-            })();
-            const ret = { code: 0 };
-            if (data) {
-                ret.data = data;
-            }
-            return JSON.stringify(ret);
-        } catch (e) {
-            return JSON.stringify({code : -1, message: e.message});
-        }
-    })();
-    `
-
 export class CLI extends EventEmitter {
-	private options: CLIOptions
+	private options: CLIRuntimeOptions
 	private client!: WebSocket
 	private requestId = 1
 	private requestContext = {}
 	private inspectorInfo!: InspectorInfo
-	constructor(options: CLIOptions) {
+	constructor(options: CLIRuntimeOptions) {
 		super()
-		assert.ok(options && typeof options === 'object')
-		assert.ok(typeof options.pid === 'number')
-		assert.ok(Array.isArray(options.cmds))
 		this.options = options
 	}
 
@@ -60,47 +34,44 @@ export class CLI extends EventEmitter {
 			this.inspectorInfo = await this.getInspectorInfo()
 			this.client = await this.connectToInspector()
 			this.listenInspectorMessage()
-			console.log('connect to inspector successfully\n')
+			// console.log('connect to inspector successfully\n')
 		} catch (e: any) {
 			console.error(e.message)
 			process.exit(0)
 		}
-		for (const [_, cmd] of Object.entries(this.options.cmds)) {
-			console.log(`starting execute cmd: ${cmd.cmd}...\n`)
-			try {
-				switch (cmd.cmd) {
-					case 'cpuprofile':
-						await this.getCPUProfile(cmd)
-						break
-					case 'heapsnapshot':
-						await this.getHeapSnapshot(cmd)
-						break
-					case 'report':
-						await this.getProcessReport(cmd)
-						break
-					case 'memory':
-						await this.getMemoryInfo(cmd)
-						break
-					// biome-ignore lint/suspicious/noFallthroughSwitchClause: <use process.exit to break>
-					case 'startInspect':
-						await this.startInspect(cmd)
-						// console.log('execute cmd done\n')
-						this.client.close()
-						process.exit(0)
-					case 'stopInspect':
-						break
-					case 'runCode':
-						await this.runCode(cmd)
-						break
-					default:
-						console.error(`invalid cmd: ${cmd.cmd}`)
-						continue
-				}
-				console.log(`execute ${cmd.cmd} successfully\n`)
-			} catch (e) {
-				console.error(`failed to execute cmd: ${cmd.cmd}: ${(e as Error).message}`)
+		const { cmd } = this.options
+		try {
+			switch (cmd.commandType) {
+				case COMMAND_TYPE.CPU_PROFILE:
+					await this.getCPUProfile(cmd)
+					break
+				case COMMAND_TYPE.HEAP_SNAPSHOT:
+					await this.getHeapSnapshot(cmd)
+					break
+				case COMMAND_TYPE.REPORT:
+					await this.getProcessReport(cmd)
+					break
+				case COMMAND_TYPE.MEMORY:
+					await this.getMemoryInfo(cmd)
+					break
+				// biome-ignore lint/suspicious/noFallthroughSwitchClause: <explanation>
+				case COMMAND_TYPE.START_INSPECT:
+					await this.startInspect(cmd)
+					this.client.close()
+					process.exit(0)
+				case COMMAND_TYPE.STOP_INSPECT:
+					break
+				case COMMAND_TYPE.RUN_CODE:
+					await this.runCode(cmd)
+					break
+				default:
+					console.error(`invalid cmd: ${cmd}`)
+					console.log(`execute ${cmd} successfully\n`)
 			}
+		} catch (e) {
+			console.error(`failed to execute cmd: ${cmd}: ${(e as Error).message}`)
 		}
+
 		this.closeInspector()
 		this.client.close()
 		process.exit(0)
@@ -245,7 +216,8 @@ export class CLI extends EventEmitter {
 		})
 	}
 
-	private async getCPUProfile(cmd) {
+	private async getCPUProfile(cmd: CommandOptions<COMMAND_TYPE.CPU_PROFILE>) {
+		const { duration } = cmd.options
 		return new Promise((resolve, reject) => {
 			this.sendMessageToInspector({ method: 'Profiler.enable' })
 			this.sendMessageToInspector({ method: 'Profiler.start' })
@@ -260,11 +232,11 @@ export class CLI extends EventEmitter {
 					reject(e)
 				}
 				this.sendMessageToInspector({ method: 'Profiler.disable' })
-			}, ~~cmd.duration || 10000)
+			}, ~~duration || 10000)
 		})
 	}
 
-	private async getHeapSnapshot(cmd) {
+	private async getHeapSnapshot(cmd: CommandOptions<COMMAND_TYPE.HEAP_SNAPSHOT>) {
 		const filename = genFilename('heapsnapshot')
 		await this.evaluate({
 			expression: FUNCTION_WRAPPER(
@@ -282,7 +254,7 @@ export class CLI extends EventEmitter {
 		console.log(`Online Analysis Url: ${getDevToolsUrl({ filename: CHROME_DEV_TASK_TYPE.HEAP_SNAPSHOT, dest })}\n`)
 	}
 
-	private async getProcessReport(cmd) {
+	private async getProcessReport(cmd: CommandOptions<COMMAND_TYPE.REPORT>) {
 		const filename = genFilename('json')
 		await this.evaluate({
 			expression: FUNCTION_WRAPPER(
@@ -299,7 +271,7 @@ export class CLI extends EventEmitter {
 		console.log(`Online Report Data Url: ${url}\n`)
 	}
 
-	private async getMemoryInfo(cmd) {
+	private async getMemoryInfo(cmd: CommandOptions<COMMAND_TYPE.MEMORY>) {
 		const data = await this.evaluate({
 			expression: FUNCTION_WRAPPER(
 				`
@@ -310,7 +282,7 @@ export class CLI extends EventEmitter {
 		console.log(`process memory info: ${JSON.stringify(data, null, 4)}`)
 	}
 
-	private async startInspect(cmd) {
+	private async startInspect(cmd: CommandOptions<COMMAND_TYPE.START_INSPECT>) {
 		const { url } = await this.evaluate({
 			expression: FUNCTION_WRAPPER(
 				`
@@ -324,11 +296,19 @@ export class CLI extends EventEmitter {
 		console.log(`devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws=${host}${pathname}\n`)
 	}
 
-	private async runCode(cmd) {
-		let code = cmd.code
-		if (/\.js$/.test(cmd.code)) {
-			code = fs.readFileSync(cmd.code)
+	private async runCode(cmd: CommandOptions<COMMAND_TYPE.RUN_CODE>) {
+		// cmd : file | code
+		// todo 支持文件
+		// todo 支持代码
+		let code = cmd.options.code || cmd.options.file
+		if (cmd.options.file && /\.js$/.test(cmd.options.file)) {
+			code = fs.readFileSync(cmd.options.file, 'utf8')
 		}
+
+		if (!code) {
+			throw new Error('No code or file provided')
+		}
+
 		const result = await this.evaluate({
 			expression: FUNCTION_WRAPPER(code),
 		})
