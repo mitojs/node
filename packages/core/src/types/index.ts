@@ -1,2 +1,2 @@
-export * from './cli'
-export * from './commands'
+export * from './cli.js';
+export * from './commands.js';

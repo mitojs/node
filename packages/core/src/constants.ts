@@ -1,4 +1,4 @@
-import type { CommandConfig } from './types'
+import type { CommandConfig } from './types/index.js';
 
 export enum COMMAND_TYPE {
 	CPU_PROFILE = 'cpuprofile',
@@ -8,6 +8,7 @@ export enum COMMAND_TYPE {
 	START_INSPECT = 'start-inspect',
 	STOP_INSPECT = 'stop-inspect',
 	RUN_CODE = 'run-code',
+	MONITOR_CPU = 'monitor-cpu',
 }
 
 export enum CHROME_DEV_TASK_TYPE {
@@ -75,5 +76,9 @@ export const COMMAND_CONFIGS: CommandConfig[] = [
 				description: 'run code from string',
 			},
 		],
+	},
+	{
+		command: COMMAND_TYPE.MONITOR_CPU,
+		description: 'Real-time monitor CPU usage of the target process',
 	},
 ]

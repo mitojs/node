@@ -9,6 +9,7 @@
 	},
 	"main": "src/index.ts",
 	"module": "src/index.ts",
+	"type": "module",
 	"types": "src/index.ts",
 	"publishConfig": {
 		"main": "dist/index.js",
@@ -30,7 +31,11 @@
 	"dependencies": {
 		"@mono/rollup": "workspace:*",
 		"@mono/shared": "workspace:*",
+		"@types/ink": "2.0.3",
+		"@types/react": "19.0.8",
 		"commander": "^14.0.0",
+		"ink": "6.0.1",
+		"react": "19.1.0",
 		"uuid": "^11.1.0",
 		"ws": "^8.18.3"
 	},

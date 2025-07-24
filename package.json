@@ -65,5 +65,12 @@
 		"commitizen": {
 			"path": "node_modules/cz-git"
 		}
+	},
+	"dependencies": {
+		"@rollup/plugin-babel": "^6.0.3",
+		"cac": "^6.7.14",
+		"execa": "^6.1.0",
+		"minimist": "^1.2.8",
+		"rollup-plugin-dts": "^5.3.0"
 	}
 }

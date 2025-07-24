@@ -1,4 +1,4 @@
-import { COMMAND_TYPE } from '../constants'
+import { COMMAND_TYPE } from '../constants.js';
 
 // 各个命令对应的选项类型
 export interface CpuProfileOptions {
@@ -29,6 +29,7 @@ export type CommandOptionsMap = {
 	[COMMAND_TYPE.START_INSPECT]: EmptyOptions
 	[COMMAND_TYPE.STOP_INSPECT]: EmptyOptions
 	[COMMAND_TYPE.RUN_CODE]: RunCodeOptions
+	[COMMAND_TYPE.MONITOR_CPU]: EmptyOptions
 }
 
 // 工具类型：根据命令类型获取对应的选项类型
@@ -46,6 +47,7 @@ export type AllCommandOptions =
 	| CommandOptions<COMMAND_TYPE.START_INSPECT>
 	| CommandOptions<COMMAND_TYPE.STOP_INSPECT>
 	| CommandOptions<COMMAND_TYPE.RUN_CODE>
+	| CommandOptions<COMMAND_TYPE.MONITOR_CPU>
 
 export interface CommandConfig {
 	command: COMMAND_TYPE
