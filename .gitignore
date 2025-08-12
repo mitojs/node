@@ -24,3 +24,4 @@ temp
 dist
 lib
 .nx
+agent/target
