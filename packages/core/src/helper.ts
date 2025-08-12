@@ -2,7 +2,7 @@ import { tmpdir } from 'os'
 import { v4 as uuidv4 } from 'uuid'
 
 const tmpdirPath = tmpdir()
-const HOST = process.env.MITO_HOST || 'example.com'
+const HOST = 'example.com'
 
 export function getDay() {
 	const date = new Date()
@@ -47,3 +47,11 @@ export const FUNCTION_WRAPPER = (code: string) => `(async function() {
         }
     })();
     `
+
+export function safeCallSync(fn: Function, data?: any) {
+	try {
+		return fn(data)
+	} catch (_) {
+		// logger.info(`safeCall: failed to call ${fn.name}: ${e.message}`);
+	}
+}

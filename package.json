@@ -9,7 +9,7 @@
 		"app/*"
 	],
 	"scripts": {
-		"commit": "git add . && git cz",
+		"commit": "git add . && git czg",
 		"esm": "pnpm --parallel esm",
 		"watch:esm": "pnpm --parallel --stream watch:esm",
 		"build": "pnpm --parallel build",
@@ -42,7 +42,7 @@
 		"@types/node": "^22.1.0",
 		"chalk": "^5.3.0",
 		"consola": "^3.2.3",
-		"cz-git": "^1.9.4",
+		"czg": "^1.12.0",
 		"debug": "^4.3.6",
 		"fast-glob": "^3.3.2",
 		"husky": "^9.1.7",
@@ -60,11 +60,6 @@
 		"ts-jest": "^29.2.4",
 		"tslib": "^2.6.3",
 		"typescript": "^5.8.3"
-	},
-	"config": {
-		"commitizen": {
-			"path": "node_modules/cz-git"
-		}
 	},
 	"dependencies": {
 		"@rollup/plugin-babel": "^6.0.3",

@@ -2,13 +2,13 @@ import * as fs from 'node:fs'
 import * as http from 'node:http'
 import * as net from 'node:net'
 import { EventEmitter } from 'events'
+import { render } from 'ink'
+import React from 'react'
 import WebSocket from 'ws'
-import { CHROME_DEV_TASK_TYPE, COMMAND_TYPE } from './constants.js';
-import { render } from 'ink';
-import CPUGraph from './CPUGraph.js';
-import { FUNCTION_WRAPPER, genFilename, getDevToolsUrl, upload } from './helper.js';
-import type { CLIRuntimeOptions, CommandOptions } from './types/index.js';
-import React from 'react';
+import CPUGraph from './CPUGraph.js'
+import { CHROME_DEV_TASK_TYPE, COMMAND_TYPE } from './constants.js'
+import { FUNCTION_WRAPPER, genFilename, getDevToolsUrl, upload } from './helper.js'
+import type { CLIRuntimeOptions, CommandOptions } from './types/index.js'
 
 interface InspectorInfo {
 	description: string
@@ -58,8 +58,8 @@ export class CLI extends EventEmitter {
 					await this.getMemoryInfo(cmd)
 					break
 				case COMMAND_TYPE.MONITOR_CPU:
-					await this.getMonitorCPU(cmd);
-					break;
+					await this.getMonitorCPU(cmd)
+					break
 				// biome-ignore lint/suspicious/noFallthroughSwitchClause: <explanation>
 				case COMMAND_TYPE.START_INSPECT:
 					await this.startInspect(cmd)
@@ -342,10 +342,10 @@ export class CLI extends EventEmitter {
 		}
 	}
 
-    private async getMonitorCPU(cmd: CommandOptions<COMMAND_TYPE.MONITOR_CPU>) {
-        const pid = this.options.pid;
-        render(React.createElement(CPUGraph, { pid }));
-        // 阻塞主进程直到用户Ctrl+C
-        await new Promise(() => {});
-    }
+	private async getMonitorCPU(cmd: CommandOptions<COMMAND_TYPE.MONITOR_CPU>) {
+		const pid = this.options.pid
+		render(React.createElement(CPUGraph, { pid }))
+		// 阻塞主进程直到用户Ctrl+C
+		await new Promise(() => {})
+	}
 }
