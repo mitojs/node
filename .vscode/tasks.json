@@ -1,0 +1,23 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "cargo build",
+			"type": "shell",
+			"command": "cargo",
+			"args": ["build"],
+			"options": {
+				"cwd": "${workspaceFolder}/agent"
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"presentation": {
+				"reveal": "silent",
+				"panel": "shared",
+				"clear": true
+			}
+		}
+	]
+}

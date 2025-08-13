@@ -82,7 +82,7 @@ async fn handle_client(mut stream: UnixStream) {
 
     loop {
         buffer.clear();
-        // 在换行时读取数据
+        // 在接收 换行符 触发回调
         match buf_reader.read_line(&mut buffer).await {
             Ok(0) => {
                 // 连接关闭
