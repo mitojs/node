@@ -16,20 +16,20 @@ impl UdsSocket {
         let tmp_path = get_tmp_path();
         let socket_path = Path::new(&tmp_path).join(UDS_SOCKET_NAME);
         println!("socket_path: {:?}", socket_path);
-        
+
         // 如果 socket 文件已存在，先删除它
         if socket_path.exists() {
             fs::remove_file(&socket_path)?;
         }
-        
+
         let listener = UnixListener::bind(&socket_path)?;
-        
+
         // 设置为非阻塞模式
         listener.set_nonblocking(true)?;
-        
+
         // 克隆 listener 用于异步任务
         let listener_clone = listener.try_clone()?;
-        
+
         // 使用 tokio::spawn 在后台处理连接
         task::spawn(async move {
             loop {
@@ -49,7 +49,7 @@ impl UdsSocket {
                 }
             }
         });
-        
+
         println!("UDS socket 创建成功，连接监听已在后台启动");
         Ok(UdsSocket {
             listener,
@@ -67,6 +67,7 @@ impl Drop for UdsSocket {
         // 在进程关闭时自动移除 socket 文件
         if self.socket_path.exists() {
             let _ = fs::remove_file(&self.socket_path);
+            println!("UDS socket 文件已移除");
         }
     }
 }
