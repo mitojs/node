@@ -1,38 +1,47 @@
-use crate::helper::constants::UDS_SOCKET_NAME;
-use crate::helper::path::get_tmp_path;
-use serde_json::Value;
 use std::fs;
 use std::os::unix::net::UnixListener;
 use std::path::{Path, PathBuf};
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::net::UnixStream;
 use tokio::task;
 
+// 定义回调函数类型
+// 一定要加 dyn，
+pub type DataCallback = Arc<dyn Fn(&str) + Send + Sync>;
+
+// pub trait UdsSocketTrait {
+//     fn set_callback(self, callback: DataCallback);
+// }
+
 pub struct UdsSocket {
-    listener: UnixListener,
-    socket_path: PathBuf,
+    pub listener: UnixListener,
+    pub socket_path: PathBuf,
 }
 
 impl UdsSocket {
-    pub fn new() -> Result<Self, std::io::Error> {
-        // 调用 utils::path 模块的 get_tmp_path 函数获取临时路径
-        let tmp_path = get_tmp_path();
-        let socket_path = Path::new(&tmp_path).join(UDS_SOCKET_NAME);
-        println!("socket_path: {:?}", socket_path);
-
+    pub fn new(socket_path: PathBuf) -> Result<Self, std::io::Error> {
         // 如果 socket 文件已存在，先删除它
         if socket_path.exists() {
             fs::remove_file(&socket_path)?;
         }
 
         let listener = UnixListener::bind(&socket_path)?;
-
         // 设置为非阻塞模式
         listener.set_nonblocking(true)?;
+        println!("UDS socket Bind 成功，socket_path: {:?}", socket_path);
+        Ok(UdsSocket {
+            listener,
+            socket_path,
+        })
+    }
 
-        // 克隆 listener 用于异步任务
-        let listener_clone = listener.try_clone()?;
-
+    pub fn set_callback(&self, callback: DataCallback) {
+        let listener_clone = self.listener.try_clone().unwrap();
+        println!(
+            "UDS socket set_callback 成功，socket_path: {:?}",
+            self.socket_path
+        );
         // 使用 tokio::spawn 在后台处理连接
         task::spawn(async move {
             loop {
@@ -45,9 +54,10 @@ impl UdsSocket {
                         stream.set_nonblocking(true).unwrap();
                         let tokio_stream = UnixStream::from_std(stream).unwrap();
 
-                        // 为每个连接创建一个处理任务
+                        // 为每个连接创建一个处理任务，每个链接可能是在独立的线程中处理
+                        let callback_for_independent_task = callback.clone();
                         task::spawn(async move {
-                            handle_client(tokio_stream).await;
+                            handle_client(tokio_stream, callback_for_independent_task).await;
                         });
                     }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -62,21 +72,11 @@ impl UdsSocket {
                 }
             }
         });
-
-        println!("UDS socket 创建成功，连接监听已在后台启动");
-        Ok(UdsSocket {
-            listener,
-            socket_path,
-        })
-    }
-
-    pub fn listener(&self) -> &UnixListener {
-        &self.listener
     }
 }
 
 // 处理客户端连接的异步函数
-async fn handle_client(mut stream: UnixStream) {
+async fn handle_client(mut stream: UnixStream, callback: DataCallback) {
     let mut buf_reader = BufReader::new(&mut stream);
     let mut buffer = String::new();
 
@@ -98,27 +98,14 @@ async fn handle_client(mut stream: UnixStream) {
                     serde_json::from_str::<serde_json::Value>(received_data).unwrap()
                 );
 
-                // 这里可以添加数据处理逻辑
-                process_received_data(received_data).await;
+                // 调用回调函数处理数据
+                callback(received_data);
             }
             Err(e) => {
                 eprintln!("读取数据时发生错误: {}", e);
                 break;
             }
         }
-    }
-}
-
-// 处理接收到的数据
-async fn process_received_data(data: &str) {
-    println!("处理数据: {}", data);
-
-    // 这里可以根据需要添加具体的数据处理逻辑
-    // 例如：解析JSON、执行命令、存储数据等
-    match data {
-        "ping" => println!("收到ping，回复pong"),
-        "status" => println!("系统状态正常"),
-        _ => println!("未知命令: {}", data),
     }
 }
 
