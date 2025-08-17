@@ -1,6 +1,6 @@
 use std::fs;
 use std::os::unix::net::UnixListener;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::net::UnixStream;
@@ -85,21 +85,12 @@ async fn handle_client(mut stream: UnixStream, callback: DataCallback) {
         // 在接收 换行符 触发回调
         match buf_reader.read_line(&mut buffer).await {
             Ok(0) => {
-                // 连接关闭
                 println!("客户端连接已关闭");
                 break;
             }
-            Ok(n) => {
-                // 成功读取数据
-                let received_data = buffer.trim();
-                println!(
-                    "接收到数据 ({} 字节): {:?}",
-                    n,
-                    serde_json::from_str::<serde_json::Value>(received_data).unwrap()
-                );
-
-                // 调用回调函数处理数据
-                callback(received_data);
+            Ok(_size) => {
+                // 成功读取数据，调用回调函数处理数据
+                callback(buffer.trim());
             }
             Err(e) => {
                 eprintln!("读取数据时发生错误: {}", e);

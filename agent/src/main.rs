@@ -12,10 +12,8 @@ use crate::ipc::uds::UdsSocket;
 
 #[tokio::main]
 async fn main() {
-    println!("Agent 启动中...");
+    println!("Agent 启动，监听 uds socket 中...");
     let socket_path = helper::path::get_socket_path();
-    println!("socket_path: {:?}", socket_path);
-    // 创建回调函数来处理接收到的数据
 
     let uds_socket = match UdsSocket::new(socket_path) {
         Ok(socket) => socket,

@@ -27,6 +27,7 @@ pub fn get_tmp_path() -> String {
 ///
 /// 返回 UDS 套接字的路径
 pub fn get_socket_path() -> PathBuf {
+    // todo 也可以指定从环境变量中获取
     let tmp_path = get_tmp_path();
     Path::new(&tmp_path).join(UDS_SOCKET_NAME)
 }
