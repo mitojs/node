@@ -2,8 +2,16 @@
 	"extends": "@mono/tsconfig",
 	"compilerOptions": {
 		"rootDir": "src",
-		"outDir": "esm"
+		"outDir": "dist",
+		"target": "ES2020",
+		"module": "CommonJS",
+		"declaration": true,
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true
 	},
 	"include": ["src/**/*.ts"],
+	"exclude": ["src/**/*.spec.ts", "src/**/__test__/**/*"],
 	"references": []
 }
