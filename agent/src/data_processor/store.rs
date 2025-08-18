@@ -18,6 +18,8 @@ pub enum ActionType {
 }
 
 #[derive(Debug, Deserialize, Serialize, EnumString, Display)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum CommandType {
     Action,
     Metric,
@@ -30,6 +32,15 @@ pub struct CpuMetricData {
 
 pub struct MemoryMetricData {
     memory: u64,
+}
+
+pub struct GetCpuProfileActionData {
+    duration: i32,
+    interval: i32,
+}
+
+pub struct GetMemoryProfileActionData {
+    duration: i32,
 }
 
 // todo 约束 T 和 DataType 的关系
@@ -50,3 +61,10 @@ pub struct ProcessActionInfo {
     pub command_type: CommandType,
     // data: Box<T>,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BaseCommandData {
+    pub command_type: CommandType,
+}
+
+// todo 存储进程和 uds 的关系
