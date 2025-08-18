@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { program } from 'commander'
-import { CLI } from './cli.js';
-import { COMMAND_CONFIGS, type COMMAND_TYPE } from './constants.js';
-import type { AllCommandOptions, CommandOptions } from './types/commands.js';
+import { CLI } from './cli.js'
+import { COMMAND_CONFIGS, type COMMAND_TYPE } from './constants.js'
+import type { AllCommandOptions, CommandOptions } from './types/commands.js'
 
 interface CmdOptions {
 	pid: string

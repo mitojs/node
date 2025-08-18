@@ -1,4 +1,4 @@
-import type { CommandConfig } from './types/index.js';
+import type { CommandConfig } from './types/index.js'
 
 export enum COMMAND_TYPE {
 	CPU_PROFILE = 'cpuprofile',

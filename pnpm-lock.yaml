@@ -152,14 +152,17 @@ importers:
         specifier: ^6.1.0
         version: 6.1.0(@types/node@22.13.1)(terser@5.38.2)(yaml@2.7.0)
 
-  packages/core:
+  packages/node:
+    devDependencies:
+      '@mono/tsconfig':
+        specifier: workspace:*
+        version: link:../../utils/tsconfig
+
+  packages/node-cli:
     dependencies:
       '@mono/rollup':
         specifier: workspace:*
         version: link:../../utils/rollup
-      '@mono/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@types/ink':
         specifier: 2.0.3
         version: 2.0.3(@types/react@19.0.8)(react@19.1.0)
@@ -188,12 +191,6 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
-
-  packages/shared:
-    devDependencies:
-      '@mono/tsconfig':
-        specifier: workspace:*
-        version: link:../../utils/tsconfig
 
   utils/rollup:
     devDependencies:

@@ -54,6 +54,7 @@ pub struct ProcessMetricInfo {
     // data: Box<T>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ProcessActionInfo {
     pub process_id: String,
     pub thread_id: Option<String>,

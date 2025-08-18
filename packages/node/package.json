@@ -1,7 +1,7 @@
 {
-	"name": "@mono/shared",
+	"name": "@mitojs/node",
 	"version": "0.0.1",
-	"description": "@mono/shared",
+	"description": "@mitojs/node",
 	"author": "cjinhuo",
 	"license": "MIT",
 	"main": "src/index.ts",

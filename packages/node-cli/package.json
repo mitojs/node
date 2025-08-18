@@ -1,7 +1,7 @@
 {
-	"name": "@mitojs/node",
+	"name": "@mitojs/node-cli",
 	"version": "0.0.1",
-	"description": "@mitojs/node",
+	"description": "@mitojs/node-cli",
 	"author": "cjinhuo",
 	"license": "MIT",
 	"bin": {
@@ -30,7 +30,6 @@
 	},
 	"dependencies": {
 		"@mono/rollup": "workspace:*",
-		"@mono/shared": "workspace:*",
 		"@types/ink": "2.0.3",
 		"@types/react": "19.0.8",
 		"commander": "^14.0.0",

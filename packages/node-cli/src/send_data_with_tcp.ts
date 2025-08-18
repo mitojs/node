@@ -6,6 +6,9 @@ function main() {
 		host: '127.0.0.1',
 	})
 	let count = 0
+	socket.on('data', (data) => {
+		console.log('receive data', data.toString())
+	})
 	setInterval(() => {
 		const data = {
 			type: 'data',

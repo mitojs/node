@@ -1,4 +1,4 @@
-import { COMMAND_TYPE } from '../constants.js';
+import { COMMAND_TYPE } from '../constants.js'
 
 // 各个命令对应的选项类型
 export interface CpuProfileOptions {
