@@ -29,11 +29,7 @@ if [[ "$1" == "--all" ]]; then
 elif [[ "$1" == "--cross" ]]; then
     echo "交叉编译 macOS 和 Linux 平台..."
     if [[ "$CURRENT_OS" == "Darwin" ]]; then
-        if [[ "$CURRENT_ARCH" == "arm64" ]]; then
-            TARGETS=("aarch64-apple-darwin" "x86_64-unknown-linux-musl" "aarch64-unknown-linux-musl")
-        else
-            TARGETS=("x86_64-apple-darwin" "x86_64-unknown-linux-musl" "aarch64-unknown-linux-musl")
-        fi
+        TARGETS=("aarch64-apple-darwin" x86_64-apple-darwin "x86_64-unknown-linux-musl" "aarch64-unknown-linux-musl")
     else
         TARGETS=("x86_64-unknown-linux-musl" "aarch64-unknown-linux-musl")
     fi
@@ -135,7 +131,6 @@ for target in "${TARGETS[@]}"; do
         if ! command -v musl-gcc &> /dev/null; then
             echo "警告: 未找到 musl 交叉编译工具链，跳过 $target 编译"
             echo "请安装: brew install FiloSottile/musl-cross/musl-cross"
-            echo "或者使用 Docker 进行交叉编译"
             continue
         fi
     fi
