@@ -7,56 +7,68 @@ use crate::{
 
 pub fn data_subscription() -> DataCallback {
     Arc::new(|data: &str| {
-        println!("data_subscription接收到数据: {}", data);
-        // 在这里可以添加更多的数据处理逻辑
-        match serde_json::from_str::<BaseCommandData>(data) {
-            Ok(json_data) => {
-                match json_data.command_type {
-                    CommandType::Metric => {
-                        // 尝试解析为 ProcessMetricInfo
-                        match serde_json::from_str::<ProcessMetricInfo>(data) {
-                            Ok(metric_info) => handle_metric(metric_info),
-                            Err(err) => println!("解析 Metric 数据失败: {:?}", err),
-                        }
-                    }
-                    CommandType::Action => {
-                        // 尝试解析为 ProcessActionInfo
-                        match serde_json::from_str::<ProcessActionInfo>(data) {
-                            Ok(action_info) => handle_action(action_info),
-                            Err(err) => println!("解析 Action 数据失败: {:?}", err),
-                        }
-                    }
-                }
-            }
-            Err(err) => {
-                println!("序列化 JSON 数据失败 {},错误信息: {:?}", data, err);
-            }
+        if data.trim().is_empty() {
+            return;
+        }
+        
+        println!("📥 接收到数据: {}", data);
+        
+        match process_data(data) {
+            Ok(_) => println!("✅ 数据处理成功"),
+            Err(e) => eprintln!("❌ 数据处理失败: {}", e),
         }
     })
 }
 
-pub fn handle_metric(metric_info: ProcessMetricInfo) {
-    match metric_info.metric_type {
-        MetricType::Cpu => {
-            println!("处理 CPU 指标: {:?}", metric_info);
-            // TODO: 实现 CPU 指标处理逻辑
+fn process_data(data: &str) -> Result<(), String> {
+    // 首先尝试解析基础命令数据
+    let base_data: BaseCommandData = serde_json::from_str(data)
+        .map_err(|e| format!("解析基础命令数据失败: {}", e))?;
+    
+    match base_data.command_type {
+        CommandType::Metric => {
+            let metric_info: ProcessMetricInfo = serde_json::from_str(data)
+                .map_err(|e| format!("解析指标数据失败: {}", e))?;
+            handle_metric(metric_info)
         }
-        MetricType::Memory => {
-            println!("处理 内存 指标: {:?}", metric_info);
-            // TODO: 实现内存指标处理逻辑
+        CommandType::Action => {
+            let action_info: ProcessActionInfo = serde_json::from_str(data)
+                .map_err(|e| format!("解析操作数据失败: {}", e))?;
+            handle_action(action_info)
         }
     }
 }
 
-pub fn handle_action(action_info: ProcessActionInfo) {
+fn handle_metric(metric_info: ProcessMetricInfo) -> Result<(), String> {
+    println!("📊 处理指标数据: {:?}", metric_info);
+    
+    match metric_info.metric_type {
+        MetricType::Cpu => {
+            println!("🖥️  处理 CPU 指标");
+            // TODO: 实现 CPU 指标处理逻辑
+            Ok(())
+        }
+        MetricType::Memory => {
+            println!("🧠 处理内存指标");
+            // TODO: 实现内存指标处理逻辑
+            Ok(())
+        }
+    }
+}
+
+fn handle_action(action_info: ProcessActionInfo) -> Result<(), String> {
+    println!("⚡ 处理操作数据: {:?}", action_info);
+    
     match action_info.action_type {
         ActionType::GetCpuProfile => {
-            println!("处理 CPU Profile 操作: {:?}", action_info);
+            println!("🖥️  获取 CPU Profile");
             // TODO: 实现 CPU Profile 获取逻辑
+            Ok(())
         }
         ActionType::GetMemoryProfile => {
-            println!("处理 Memory Profile 操作: {:?}", action_info);
+            println!("🧠 获取 Memory Profile");
             // TODO: 实现 Memory Profile 获取逻辑
+            Ok(())
         }
     }
 }
