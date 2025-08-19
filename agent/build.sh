@@ -15,6 +15,9 @@ set -e
 
 echo "开始跨平台构建 mitojs-agent..."
 
+# 强制使用 rustup 工具链，避免 Homebrew rustc 的交叉编译问题
+export PATH="$HOME/.cargo/bin:$PATH"
+
 # 创建输出目录
 mkdir -p ../packages/node/binaries
 
@@ -87,7 +90,7 @@ get_binary_name() {
 # 如果没有指定目标平台，进行本地编译
 if [[ ${#TARGETS[@]} -eq 0 ]]; then
     echo "进行本地编译..."
-    cargo build --release --bin mitojs-agent
+    cargo +stable build --release --bin mitojs-agent
     
     # 复制到目标目录
     if [[ -f "target/release/mitojs-agent" ]]; then
@@ -135,8 +138,8 @@ for target in "${TARGETS[@]}"; do
         fi
     fi
     
-    # 编译
-    cargo build --release --target="$target" --bin mitojs-agent
+    # 使用 rustup 工具链编译
+    RUSTC=$(rustup which rustc) cargo +stable build --release --target="$target" --bin mitojs-agent
     
     # 复制二进制文件到目标目录
     source_path="target/$target/release/mitojs-agent"
