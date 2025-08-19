@@ -7,6 +7,7 @@
 #   ./build.sh          # 编译当前平台
 #   ./build.sh --cross  # 交叉编译当前平台 + Linux 平台 (需要交叉编译工具链)
 #   ./build.sh --all    # 编译所有支持的平台 (需要交叉编译工具链)
+#   ./build.sh --windows # 单独编译 Windows 平台 (需要交叉编译工具链)
 #
 # 注意: 在 macOS 上交叉编译 Linux 需要安装额外的工具链:
 #   brew install FiloSottile/musl-cross/musl-cross
@@ -43,7 +44,7 @@ readonly BINARY_NAME="mitojs-agent"
 
 # 目标平台配置 - 使用普通数组替代关联数组以提高兼容性
 TARGET_CONFIGS=(
-    "x86_64-pc-windows-gnu:mitojs-agent-win32-x64.exe"
+    "x86_64-pc-windows-gnu:mitojs-agent-win-x64.exe"
     "x86_64-unknown-linux-musl:mitojs-agent-linux-x64-musl"
     "aarch64-unknown-linux-musl:mitojs-agent-linux-arm64-musl"
     "x86_64-apple-darwin:mitojs-agent-darwin-x64"
@@ -67,6 +68,9 @@ determine_targets() {
     case "$build_mode" in
         "--all")
             echo "aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-pc-windows-gnu"
+            ;;
+        "--windows")
+            echo "x86_64-pc-windows-gnu"
             ;;
         "--cross")
             if [[ "$os" == "Darwin" ]]; then
