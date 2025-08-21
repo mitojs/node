@@ -11,8 +11,8 @@ use crate::ipc::tcp::{TcpConfig, TcpSocket};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 加载配置
-    let config = AppConfig::from_env();
+    //
+    let config: AppConfig = AppConfig::from_env();
 
     // 验证配置
     config

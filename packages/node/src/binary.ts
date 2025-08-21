@@ -1,7 +1,7 @@
-import { type ChildProcess, spawn } from 'child_process'
-import { existsSync } from 'fs'
-import { arch, platform } from 'os'
-import { join } from 'path'
+import { type ChildProcess, spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { arch, platform } from 'node:os'
+import { join } from 'node:path'
 
 /**
  * 平台和架构映射
@@ -29,7 +29,7 @@ function getPlatformInfo(): PlatformInfo {
 			binaryName = currentArch === 'arm64' ? 'mitojs-agent-darwin-arm64' : 'mitojs-agent-darwin-x64'
 			break
 		case 'linux':
-			binaryName = currentArch === 'arm64' ? 'mitojs-agent-linux-arm64' : 'mitojs-agent-linux-x64'
+			binaryName = currentArch === 'arm64' ? 'mitojs-agent-linux-arm64-musl' : 'mitojs-agent-linux-x64-musl'
 			break
 		default:
 			throw new Error(`不支持的平台: ${currentPlatform}-${currentArch}`)
@@ -87,7 +87,9 @@ export class MitojsAgent {
 			}
 
 			this.process = spawn(this.binaryPath, args, {
-				stdio: ['pipe', 'pipe', 'pipe'],
+				// todo 线上改为 ignore
+				stdio: 'pipe',
+				// todo 通过环境变量控制，本地调试时 detached：false，线上改为 true
 				detached: false,
 			})
 
@@ -160,11 +162,6 @@ export class MitojsAgent {
 /**
  * 创建 Agent 实例
  */
-export function createAgent(): MitojsAgent {
+export function initAgent(): MitojsAgent {
 	return new MitojsAgent()
 }
-
-/**
- * 获取平台信息（导出供外部使用）
- */
-export { getPlatformInfo }

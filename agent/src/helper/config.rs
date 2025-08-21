@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use crate::helper::constants::AGENT_TCP_PORT;
+
 /// 应用程序配置
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -27,8 +29,8 @@ impl Default for AppConfig {
 impl Default for TcpConfig {
     fn default() -> Self {
         Self {
-            port: 12345,
-            host: "127.0.0.1".to_string(),
+            port: AGENT_TCP_PORT,
+            host: "localhost".to_string(),
             heartbeat_interval: Duration::from_secs(5),
             max_connections: 100,
             connection_timeout: Duration::from_secs(30),
