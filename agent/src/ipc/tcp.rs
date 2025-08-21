@@ -13,8 +13,6 @@ pub type DataCallback = Arc<dyn Fn(&str) + Send + Sync>;
 pub struct TcpConfig {
     pub port: u16,
     pub host: String,
-    pub heartbeat_interval: Duration,
-    pub max_connections: usize,
 }
 
 impl Default for TcpConfig {
@@ -22,8 +20,6 @@ impl Default for TcpConfig {
         Self {
             port: 12345,
             host: "127.0.0.1".to_string(),
-            heartbeat_interval: Duration::from_secs(5),
-            max_connections: 100,
         }
     }
 }
@@ -56,28 +52,24 @@ impl TcpSocket {
         let config = self.config.clone();
         task::spawn(async move {
             let mut connection_count = 0;
-            
+
             loop {
                 match self.listener.accept().await {
                     Ok((stream, addr)) => {
-                        if connection_count >= config.max_connections {
-                            eprintln!("⚠️ 达到最大连接数限制: {}", config.max_connections);
-                            continue;
-                        }
-                        
                         connection_count += 1;
                         println!("🔗 接受新连接: {} (当前连接数: {})", addr, connection_count);
 
                         // 为每个连接创建一个处理任务
                         let callback_for_task = callback.clone();
                         let config_for_task = config.clone();
-                        
+
                         task::spawn(async move {
                             handle_client_with_heartbeat(
-                                stream, 
-                                callback_for_task, 
-                                config_for_task
-                            ).await;
+                                stream,
+                                callback_for_task,
+                                config_for_task,
+                            )
+                            .await;
                             connection_count -= 1;
                             println!("🔌 连接关闭，当前连接数: {}", connection_count);
                         });
@@ -94,7 +86,7 @@ impl TcpSocket {
 
 // 处理客户端连接并定时发送心跳的异步函数
 async fn handle_client_with_heartbeat(
-    stream: TcpStream, 
+    stream: TcpStream,
     callback: DataCallback,
     config: TcpConfig,
 ) {
@@ -102,7 +94,7 @@ async fn handle_client_with_heartbeat(
 
     // 创建心跳任务
     let heartbeat_task = task::spawn(async move {
-        handle_heartbeat_writer(writer, config.heartbeat_interval).await;
+        handle_heartbeat_writer(writer, Duration::from_secs(5)).await;
     });
 
     // 创建数据读取任务
@@ -149,16 +141,16 @@ async fn handle_client_reader(reader: tokio::net::tcp::OwnedReadHalf, callback: 
 
 // 定时发送心跳的异步函数
 async fn handle_heartbeat_writer(
-    mut writer: tokio::net::tcp::OwnedWriteHalf, 
-    interval_duration: Duration
+    mut writer: tokio::net::tcp::OwnedWriteHalf,
+    interval_duration: Duration,
 ) {
     let mut interval = interval(interval_duration);
     let mut counter = 0;
-    
+
     loop {
         interval.tick().await;
         counter += 1;
-        
+
         let message = format!(
             "💓 Heartbeat #{}: {}\n",
             counter,
@@ -167,12 +159,12 @@ async fn handle_heartbeat_writer(
                 .unwrap()
                 .as_secs()
         );
-        
+
         if let Err(e) = writer.write_all(message.as_bytes()).await {
             eprintln!("❌ 发送心跳失败: {}", e);
             break;
         }
-        
+
         if let Err(e) = writer.flush().await {
             eprintln!("❌ 刷新流失败: {}", e);
             break;

@@ -13,8 +13,6 @@ pub struct AppConfig {
 pub struct TcpConfig {
     pub port: u16,
     pub host: String,
-    pub heartbeat_interval: Duration,
-    pub max_connections: usize,
     pub connection_timeout: Duration,
 }
 
@@ -31,8 +29,6 @@ impl Default for TcpConfig {
         Self {
             port: AGENT_TCP_PORT,
             host: "localhost".to_string(),
-            heartbeat_interval: Duration::from_secs(5),
-            max_connections: 100,
             connection_timeout: Duration::from_secs(30),
         }
     }
@@ -54,17 +50,7 @@ impl AppConfig {
             config.tcp.host = host;
         }
 
-        if let Ok(max_conn) = std::env::var("AGENT_MAX_CONNECTIONS") {
-            if let Ok(max_conn_num) = max_conn.parse::<usize>() {
-                config.tcp.max_connections = max_conn_num;
-            }
-        }
 
-        if let Ok(heartbeat) = std::env::var("AGENT_HEARTBEAT_INTERVAL") {
-            if let Ok(heartbeat_secs) = heartbeat.parse::<u64>() {
-                config.tcp.heartbeat_interval = Duration::from_secs(heartbeat_secs);
-            }
-        }
 
         config
     }
@@ -75,10 +61,6 @@ impl AppConfig {
             return Err("TCP 端口不能为 0".to_string());
         }
 
-        if self.tcp.max_connections == 0 {
-            return Err("最大连接数不能为 0".to_string());
-        }
-
         Ok(())
     }
 
@@ -87,8 +69,6 @@ impl AppConfig {
         println!("📋 应用程序配置:");
         println!("  TCP 服务器:");
         println!("    地址: {}:{}", self.tcp.host, self.tcp.port);
-        println!("    最大连接数: {}", self.tcp.max_connections);
-        println!("    心跳间隔: {:?}", self.tcp.heartbeat_interval);
         println!("    连接超时: {:?}", self.tcp.connection_timeout);
         println!("  服务器:");
     }
