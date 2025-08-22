@@ -1,4 +1,4 @@
-import { configMap } from './shared/config'
+import { configMap } from './config'
 import { easyFetch, type FetchOptions, retry } from './shared/utils'
 import type { RegisterProcessData } from './types'
 

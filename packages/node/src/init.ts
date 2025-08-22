@@ -1,9 +1,10 @@
+import { configMap } from './config'
 import { DEFAULT_TCP_PORT } from './shared'
-import { configMap } from './shared/config'
 
 export function initConfig() {
+	// 也可以通过环境变量配置
 	configMap.set({
-		agentTCPPort: DEFAULT_TCP_PORT,
+		agentTCPPort: Number(process.env.MITO_AGENT_TCP_PORT) || DEFAULT_TCP_PORT,
 		agentHost: 'localhost',
 	})
 }

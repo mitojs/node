@@ -43,7 +43,7 @@ ipc_manager.send_message(message).unwrap();
 
 // 启动监听器
 let _handle = ipc_manager.start_listener(|message| {
-    println!("收到消息: {:?}", message);
+    log_print!("收到消息: {:?}", message);
 });
 ```
 
@@ -78,7 +78,7 @@ let mut processor = DataProcessor::with_default_config();
 let json_data = r#"{"name": "test"}"#;
 let result = processor.process_data("key1", json_data, DataType::Json).unwrap();
 
-println!("处理结果: {:?}", result.data_type);
+log_print!("处理结果: {:?}", result.data_type);
 ```
 
 ## 运行项目

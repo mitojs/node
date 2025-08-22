@@ -5,9 +5,8 @@
 #
 # 用法:
 #   ./build.sh          # 编译当前平台
-#   ./build.sh --cross  # 交叉编译当前平台 + Linux 平台 (需要交叉编译工具链)
+#   ./build.sh --unix  # 交叉编译当前平台 + Linux 平台 (需要交叉编译工具链)
 #   ./build.sh --all    # 编译所有支持的平台 (需要交叉编译工具链)
-#   ./build.sh --windows # 单独编译 Windows 平台 (需要交叉编译工具链)
 #
 # 注意: 在 macOS 上交叉编译 Linux 需要安装额外的工具链:
 #   brew install FiloSottile/musl-cross/musl-cross
@@ -69,10 +68,7 @@ determine_targets() {
         "--all")
             echo "aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-pc-windows-gnu"
             ;;
-        "--windows")
-            echo "x86_64-pc-windows-gnu"
-            ;;
-        "--cross")
+        "--unix")
             if [[ "$os" == "Darwin" ]]; then
                 echo "aarch64-apple-darwin x86_64-apple-darwin x86_64-unknown-linux-musl aarch64-unknown-linux-musl"
             else
@@ -133,7 +129,7 @@ check_toolchain_dependencies() {
             if [[ "$current_os" == "Darwin" ]]; then
                 if ! command -v musl-gcc &> /dev/null; then
                     log_warning "未找到 musl 交叉编译工具链，跳过 $target 编译"
-                    log_info "请安装: brew install FiloSottile/musl-cross/musl-cross"
+                    log_info "请安装: brew install FiloSottile/musl-unix/musl-cross"
                     return 1
                 fi
             fi

@@ -1,6 +1,7 @@
 import { initAgent } from './binary'
+import { configMap } from './config'
 import { initConfig } from './init'
-import { MITO_NODE } from './shared'
+import { logger, MITO_NODE } from './shared'
 
 export async function init() {
 	if (global[MITO_NODE]) {
@@ -12,8 +13,13 @@ export async function init() {
 		initConfig()
 		// 初始化agent
 		const agent = initAgent()
-		// 带着 port 参数启动 agent， AGENT_TCP_PORT=config.agentTCPPort
+		// 通过环境变量传递 TCP 端口启动 agent
 		await agent.start()
+		logger.info('mitojs-node init success')
 		// todo 与 agent 通信
-	} catch (error) {}
+	} catch (error) {
+		logger.error('mitojs-node init error', error)
+	}
 }
+
+init()

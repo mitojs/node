@@ -2,6 +2,8 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { arch, platform } from 'node:os'
 import { join } from 'node:path'
+import { configMap } from './config'
+import { logger } from './shared'
 
 /**
  * 平台和架构映射
@@ -74,23 +76,25 @@ export class MitojsAgent {
 	/**
 	 * 启动 Agent 进程
 	 */
-	start(port?: number): Promise<void> {
+	start(args: string[] = []): Promise<void> {
 		return new Promise((resolve, reject) => {
 			if (this.process) {
 				reject(new Error('Agent 进程已经在运行中'))
 				return
 			}
-
-			const args: string[] = []
-			if (port) {
-				args.push('--port', port.toString())
-			}
-
+			logger.info(
+				`调用 Rust Binary 启动 Agent 进程，二进制路径: ${this.binaryPath} ${args.length > 0 && `args: ${args.join('')}`}`
+			)
 			this.process = spawn(this.binaryPath, args, {
 				// todo 线上改为 ignore
 				stdio: 'pipe',
 				// todo 通过环境变量控制，本地调试时 detached：false，线上改为 true
 				detached: false,
+				env: {
+					...process.env,
+					// 通过环境变量传递配置
+					MITO_AGENT_TCP_PORT: configMap.get('agentTCPPort').toString(),
+				},
 			})
 
 			this.process.on('error', (error) => {
@@ -98,6 +102,7 @@ export class MitojsAgent {
 			})
 
 			this.process.on('spawn', () => {
+				logger.info('Agent 进程启动成功')
 				resolve()
 			})
 

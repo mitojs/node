@@ -1,4 +1,4 @@
-import type { ConfigType } from '../types'
+import type { ConfigType } from './types'
 
 /**
  * 配置管理类，支持泛型指定配置类型

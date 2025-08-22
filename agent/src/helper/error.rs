@@ -1,6 +1,9 @@
 use std::fmt;
 use std::io;
 
+// 导入宏
+use crate::{log_print, debug_print, error_print};
+
 /// 应用程序错误类型
 #[derive(Debug)]
 pub enum AppError {
@@ -63,7 +66,7 @@ pub type AppResult<T> = Result<T, AppError>;
 /// 错误处理工具函数
 pub mod utils {
     use super::*;
-    
+
     /// 将错误转换为用户友好的消息
     pub fn to_user_friendly(error: &AppError) -> String {
         match error {
@@ -75,9 +78,9 @@ pub mod utils {
             AppError::Unknown(_) => "未知错误".to_string(),
         }
     }
-    
+
     /// 记录错误日志
     pub fn log_error(error: &AppError) {
-        eprintln!("❌ 错误: {}", error);
+        error_print!("错误: {}", error);
     }
 }

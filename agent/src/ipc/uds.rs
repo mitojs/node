@@ -6,6 +6,9 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::net::UnixStream;
 use tokio::task;
 
+// 导入宏
+use crate::{log_print, debug_print, error_print};
+
 // 定义回调函数类型
 // 一定要加 dyn，
 pub type DataCallback = Arc<dyn Fn(&str) + Send + Sync>;
@@ -29,7 +32,7 @@ impl UdsSocket {
         let listener = UnixListener::bind(&socket_path)?;
         // 设置为非阻塞模式
         listener.set_nonblocking(true)?;
-        println!("UDS socket Bind 成功，socket_path: {:?}", socket_path);
+        log_print!("UDS socket Bind 成功，socket_path: {:?}", socket_path);
         Ok(UdsSocket {
             listener,
             socket_path,
@@ -38,7 +41,7 @@ impl UdsSocket {
 
     pub fn set_callback(&self, callback: DataCallback) {
         let listener_clone = self.listener.try_clone().unwrap();
-        println!(
+        log_print!(
             "UDS socket set_callback 成功，socket_path: {:?}",
             self.socket_path
         );
@@ -48,7 +51,7 @@ impl UdsSocket {
                 match listener_clone.accept() {
                     Ok((stream, _addr)) => {
                         // 新 client 链接，创建新的任务处理
-                        println!("Accepted connection from: {:?}, {:?}", stream, _addr);
+                        log_print!("Accepted connection from: {:?}, {:?}", stream, _addr);
 
                         // 将 std::os::unix::net::UnixStream 转换为 tokio::net::UnixStream
                         stream.set_nonblocking(true).unwrap();
@@ -62,11 +65,11 @@ impl UdsSocket {
                     }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                         // 非阻塞模式下没有连接时会返回 WouldBlock，等待一下再继续
-                        println!("WouldBlock, sleep 10ms");
+                        log_print!("WouldBlock, sleep 10ms");
                         tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
                     }
                     Err(e) => {
-                        eprintln!("Error accepting connection: {}", e);
+                        error_print!("Error accepting connection: {}", e);
                         break;
                     }
                 }
@@ -85,7 +88,7 @@ async fn handle_client(mut stream: UnixStream, callback: DataCallback) {
         // 在接收 换行符 触发回调
         match buf_reader.read_line(&mut buffer).await {
             Ok(0) => {
-                println!("客户端连接已关闭");
+                log_print!("客户端连接已关闭");
                 break;
             }
             Ok(_size) => {
@@ -93,7 +96,7 @@ async fn handle_client(mut stream: UnixStream, callback: DataCallback) {
                 callback(buffer.trim());
             }
             Err(e) => {
-                eprintln!("读取数据时发生错误: {}", e);
+                error_print!("读取数据时发生错误: {}", e);
                 break;
             }
         }
@@ -105,7 +108,7 @@ impl Drop for UdsSocket {
         // 在进程关闭时自动移除 socket 文件
         if self.socket_path.exists() {
             let _ = fs::remove_file(&self.socket_path);
-            println!("UDS socket 文件已移除");
+            log_print!("UDS socket 文件已移除");
         }
     }
 }

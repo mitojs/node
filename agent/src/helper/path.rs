@@ -15,7 +15,7 @@ use crate::helper::constants::UDS_SOCKET_NAME;
 ///
 /// ```
 /// let tmp_path = get_tmp_path();
-/// println!("临时目录: {}", tmp_path);
+/// log_print!("临时目录: {}", tmp_path);
 /// ```
 pub fn get_tmp_path() -> String {
     env::temp_dir().to_string_lossy().to_string()

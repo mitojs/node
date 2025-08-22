@@ -1,6 +1,7 @@
 mod data_processor;
 mod helper;
 mod ipc;
+#[macro_use]
 mod marco;
 
 use crate::helper::config::AppConfig;
@@ -9,7 +10,7 @@ use tokio::signal;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("🚀 Agent 启动中...");
+    log_print!("🚀 Agent 启动中...");
     let config: AppConfig = AppConfig::from_env();
 
     // 验证配置
@@ -28,18 +29,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::select! {
         _ = signal::ctrl_c() => {
-            println!("\n🛑 收到 Ctrl+C 信号，正在优雅关闭...");
+            log_print!("\n🛑 收到 Ctrl+C 信号，正在关闭...");
         }
         _ = http_handle => {
-            println!("HTTP 服务器已退出");
+            log_print!("HTTP 服务器已退出");
         }
     }
-
-    println!("✅ Agent 已优雅关闭");
+    log_print!("✅ Agent 已优雅关闭");
     Ok(())
 }
 
 fn init_logging(_config: &AppConfig) {
     // 简单的日志初始化，可以根据需要替换为更完整的日志系统
-    println!("📝 日志系统初始化完成");
+    log_print!("📝 日志系统初始化完成");
 }

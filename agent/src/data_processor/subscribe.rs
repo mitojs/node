@@ -5,6 +5,7 @@ use crate::{
         ActionType, BaseCommandData, CommandType, MetricType, ProcessActionInfo, ProcessMetricInfo,
     },
     ipc::tcp::DataCallback,
+    {log_print, debug_print, error_print},
 };
 
 pub fn data_subscription() -> DataCallback {
@@ -13,11 +14,11 @@ pub fn data_subscription() -> DataCallback {
             return;
         }
 
-        println!("📥 接收到数据: {}", data);
+        log_print!("📥 接收到数据: {}", data);
 
         match process_data(data) {
-            Ok(_) => println!("✅ 数据处理成功"),
-            Err(e) => eprintln!("❌ 数据处理失败: {}", e),
+            Ok(_) => log_print!("✅ 数据处理成功"),
+            Err(e) => error_print!("❌ 数据处理失败: {}", e),
         }
     })
 }
@@ -42,16 +43,16 @@ fn process_data(data: &str) -> Result<(), String> {
 }
 
 fn handle_metric(metric_info: ProcessMetricInfo) -> Result<(), String> {
-    println!("📊 处理指标数据: {:?}", metric_info);
+    log_print!("📊 处理指标数据: {:?}", metric_info);
 
     match metric_info.metric_type {
         MetricType::Cpu => {
-            println!("🖥️  处理 CPU 指标");
+            log_print!("🖥️  处理 CPU 指标");
             // TODO: 实现 CPU 指标处理逻辑
             Ok(())
         }
         MetricType::Memory => {
-            println!("🧠 处理内存指标");
+            log_print!("🧠 处理内存指标");
             // TODO: 实现内存指标处理逻辑
             Ok(())
         }
@@ -59,16 +60,16 @@ fn handle_metric(metric_info: ProcessMetricInfo) -> Result<(), String> {
 }
 
 fn handle_action(action_info: ProcessActionInfo) -> Result<(), String> {
-    println!("⚡ 处理操作数据: {:?}", action_info);
+    log_print!("⚡ 处理操作数据: {:?}", action_info);
 
     match action_info.action_type {
         ActionType::GetCpuProfile => {
-            println!("🖥️  获取 CPU Profile");
+            log_print!("🖥️  获取 CPU Profile");
             // TODO: 实现 CPU Profile 获取逻辑
             Ok(())
         }
         ActionType::GetMemoryProfile => {
-            println!("🧠 获取 Memory Profile");
+            log_print!("🧠 获取 Memory Profile");
             // TODO: 实现 Memory Profile 获取逻辑
             Ok(())
         }

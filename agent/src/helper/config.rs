@@ -1,7 +1,6 @@
 use std::time::Duration;
 
-use crate::helper::constants::AGENT_TCP_PORT;
-
+use crate::{debug_print, helper::constants::AGENT_TCP_PORT, log_print};
 /// 应用程序配置
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -40,17 +39,16 @@ impl AppConfig {
         let mut config = Self::default();
 
         // TCP 配置
-        if let Ok(port) = std::env::var("AGENT_TCP_PORT") {
+        if let Ok(port) = std::env::var("MITO_AGENT_TCP_PORT") {
             if let Ok(port_num) = port.parse::<u16>() {
+                debug_print!("ENV MITO_AGENT_TCP_PORT: {}", port_num);
                 config.tcp.port = port_num;
             }
         }
 
-        if let Ok(host) = std::env::var("AGENT_HOST") {
+        if let Ok(host) = std::env::var("MITO_AGENT_HOST") {
             config.tcp.host = host;
         }
-
-
 
         config
     }
@@ -66,10 +64,7 @@ impl AppConfig {
 
     /// 打印配置信息
     pub fn print_config(&self) {
-        println!("📋 应用程序配置:");
-        println!("  TCP 服务器:");
-        println!("    地址: {}:{}", self.tcp.host, self.tcp.port);
-        println!("    连接超时: {:?}", self.tcp.connection_timeout);
-        println!("  服务器:");
+        log_print!("📋 应用程序配置:");
+        log_print!("    地址: {}:{}", self.tcp.host, self.tcp.port);
     }
 }

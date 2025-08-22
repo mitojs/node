@@ -5,6 +5,9 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::task;
 use tokio::time::interval;
 
+// 导入宏
+use crate::{log_print, debug_print, error_print};
+
 // 定义回调函数类型
 pub type DataCallback = Arc<dyn Fn(&str) + Send + Sync>;
 
@@ -41,12 +44,12 @@ impl TcpSocket {
     pub async fn with_config(config: TcpConfig) -> Result<Self, std::io::Error> {
         let addr = format!("{}:{}", config.host, config.port);
         let listener = TcpListener::bind(&addr).await?;
-        println!("✅ TCP socket 绑定成功，监听地址: {}", addr);
+        log_print!("✅ TCP socket 绑定成功，监听地址: {}", addr);
         Ok(TcpSocket { listener, config })
     }
 
     pub async fn set_callback(self, callback: DataCallback) {
-        println!("🔄 TCP socket 设置回调成功");
+        log_print!("🔄 TCP socket 设置回调成功");
 
         // 使用 tokio::spawn 在后台处理连接
         let config = self.config.clone();
@@ -57,7 +60,11 @@ impl TcpSocket {
                 match self.listener.accept().await {
                     Ok((stream, addr)) => {
                         connection_count += 1;
-                        println!("🔗 接受新连接: {} (当前连接数: {})", addr, connection_count);
+                        log_print!(
+                            "🔗 接受新连接: {} (当前连接数: {})",
+                            addr,
+                            connection_count
+                        );
 
                         // 为每个连接创建一个处理任务
                         let callback_for_task = callback.clone();
@@ -71,11 +78,11 @@ impl TcpSocket {
                             )
                             .await;
                             connection_count -= 1;
-                            println!("🔌 连接关闭，当前连接数: {}", connection_count);
+                            log_print!("🔌 连接关闭，当前连接数: {}", connection_count);
                         });
                     }
                     Err(e) => {
-                        eprintln!("❌ 接受连接时发生错误: {}", e);
+                        error_print!("接受连接时发生错误: {}", e);
                         break;
                     }
                 }
@@ -105,10 +112,10 @@ async fn handle_client_with_heartbeat(
     // 等待任一任务完成
     tokio::select! {
         _ = heartbeat_task => {
-            println!("💓 心跳任务结束");
+            log_print!("💓 心跳任务结束");
         }
         _ = read_task => {
-            println!("📖 读取任务结束");
+            log_print!("📖 读取任务结束");
         }
     }
 }
@@ -122,7 +129,7 @@ async fn handle_client_reader(reader: tokio::net::tcp::OwnedReadHalf, callback: 
         buffer.clear();
         match buf_reader.read_line(&mut buffer).await {
             Ok(0) => {
-                println!("🔌 客户端连接已关闭");
+                log_print!("🔌 客户端连接已关闭");
                 break;
             }
             Ok(_size) => {
@@ -132,7 +139,7 @@ async fn handle_client_reader(reader: tokio::net::tcp::OwnedReadHalf, callback: 
                 }
             }
             Err(e) => {
-                eprintln!("❌ 读取数据时发生错误: {}", e);
+                error_print!("读取数据时发生错误: {}", e);
                 break;
             }
         }
@@ -161,12 +168,12 @@ async fn handle_heartbeat_writer(
         );
 
         if let Err(e) = writer.write_all(message.as_bytes()).await {
-            eprintln!("❌ 发送心跳失败: {}", e);
+            error_print!("发送心跳失败: {}", e);
             break;
         }
 
         if let Err(e) = writer.flush().await {
-            eprintln!("❌ 刷新流失败: {}", e);
+            error_print!("刷新流失败: {}", e);
             break;
         }
     }

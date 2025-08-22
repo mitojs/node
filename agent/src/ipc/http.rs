@@ -11,6 +11,8 @@ use tower_http::cors::CorsLayer;
 
 use crate::helper::config::AppConfig;
 
+use crate::{error_print, log_print};
+
 #[derive(Serialize)]
 struct InfoResponse {
     name: String,
@@ -50,7 +52,7 @@ async fn update_process(
     Json(payload): Json<UpdateProcessRequest>,
 ) -> Result<ResponseJson<UpdateProcessResponse>, StatusCode> {
     // 这里可以根据实际需求处理进程更新逻辑
-    println!("Received update_process request: {:?}", payload.action);
+    log_print!("Received update_process request: {:?}", payload.action);
 
     // 模拟处理逻辑
     let response = match payload.action.as_str() {
@@ -80,16 +82,15 @@ pub async fn create_http_server(
         .layer(CorsLayer::permissive()); // CORS 支持
 
     // 绑定地址
-    println!("HTTP server addr: {}:{}", host, port);
-
+    log_print!("before bind  addr: {}:{}", host, port);
     // 使用 lookup_host 解析主机名，支持 IPv4 和 IPv6
     let host_port = format!("{}:{}", host, port);
     let mut addrs = lookup_host(&host_port).await?;
     let addr = addrs.next().ok_or("无法解析主机地址")?;
 
-    println!("HTTP server resolved addr: {}", addr);
+    log_print!("after resolved addr: {}", addr);
     let listener = TcpListener::bind(addr).await?;
-    println!("HTTP server running on http://{}", addr);
+    log_print!("HTTP server running on http://{}", addr);
 
     // 启动服务器
     axum::serve(listener, app).await?;
@@ -98,9 +99,9 @@ pub async fn create_http_server(
 }
 
 pub async fn start_http_server(config: AppConfig) {
-    println!("🌐 启动 HTTP 服务器...");
+    log_print!("🌐 启动 HTTP 服务器...");
     if let Err(e) = create_http_server(&config.tcp.host, config.tcp.port).await {
-        eprintln!("HTTP 服务器启动失败: {}", e);
+        error_print!("HTTP 服务器启动失败: {}", e);
         // 直接退出进程
         std::process::exit(1);
     }
