@@ -83,11 +83,12 @@ export class MitojsAgent {
 				return
 			}
 			logger.info(
-				`调用 Rust Binary 启动 Agent 进程，二进制路径: ${this.binaryPath} ${args.length > 0 && `args: ${args.join('')}`}`
+				`调用 Rust Binary 启动 Agent 进程，二进制路径: ${this.binaryPath}${args.length > 0 ? ` args: ${args.join('')}` : ''}`
 			)
 			this.process = spawn(this.binaryPath, args, {
-				// todo 线上改为 ignore
-				stdio: 'pipe',
+				// [0 = stdin（标准输入）,1 = stdout（标准输出）,2 = stderr（标准错误）,3 = 额外的文件描述符，通常用于 IPC]
+				// todo 线上用 ['ignore', 'ignore', 'ignore', 'ipc']
+				stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
 				// todo 通过环境变量控制，本地调试时 detached：false，线上改为 true
 				detached: false,
 				env: {
@@ -99,6 +100,11 @@ export class MitojsAgent {
 
 			this.process.on('error', (error) => {
 				reject(new Error(`启动 Agent 失败: ${error.message}`))
+			})
+
+			this.process.on('message', (message) => {
+				console.log(message)
+				console.log(`Agent on message`)
 			})
 
 			this.process.on('spawn', () => {
@@ -113,11 +119,11 @@ export class MitojsAgent {
 
 			// 处理输出
 			this.process.stdout?.on('data', (data) => {
-				console.log(`[Agent]: ${data.toString().trim()}`)
+				// console.log(`[Agent]: ${data.toString().trim()}`)
 			})
 
 			this.process.stderr?.on('data', (data) => {
-				console.error(`[Agent Error]: ${data.toString().trim()}`)
+				// console.error(`[Agent Error]: ${data.toString().trim()}`)
 			})
 		})
 	}

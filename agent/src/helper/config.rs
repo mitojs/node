@@ -1,10 +1,13 @@
-use std::time::Duration;
-
-use crate::{debug_print, helper::constants::AGENT_TCP_PORT, log_print};
+use crate::{
+    debug_print,
+    helper::constants::{AGENT_DIR, AGENT_TCP_PORT},
+    log_print,
+};
 /// 应用程序配置
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     pub tcp: TcpConfig,
+    pub agent_dir: String,
 }
 
 /// TCP 服务器配置
@@ -12,13 +15,13 @@ pub struct AppConfig {
 pub struct TcpConfig {
     pub port: u16,
     pub host: String,
-    pub connection_timeout: Duration,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             tcp: TcpConfig::default(),
+            agent_dir: "".to_string(),
         }
     }
 }
@@ -28,27 +31,32 @@ impl Default for TcpConfig {
         Self {
             port: AGENT_TCP_PORT,
             host: "localhost".to_string(),
-            connection_timeout: Duration::from_secs(30),
         }
     }
 }
 
 impl AppConfig {
     /// 从环境变量加载配置
-    pub fn from_env() -> Self {
+    pub fn new() -> Self {
         let mut config = Self::default();
 
-        // TCP 配置
+        // 从环境变量加载 TCP 端口
         if let Ok(port) = std::env::var("MITO_AGENT_TCP_PORT") {
             if let Ok(port_num) = port.parse::<u16>() {
                 debug_print!("ENV MITO_AGENT_TCP_PORT: {}", port_num);
                 config.tcp.port = port_num;
             }
         }
-
         if let Ok(host) = std::env::var("MITO_AGENT_HOST") {
             config.tcp.host = host;
         }
+
+        // 在当前目录下创建 agent 目录
+        config.agent_dir = std::env::current_dir()
+            .unwrap()
+            .join(AGENT_DIR)
+            .to_string_lossy()
+            .to_string();
 
         config
     }

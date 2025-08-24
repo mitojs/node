@@ -2,7 +2,7 @@ use std::fmt;
 use std::io;
 
 // 导入宏
-use crate::{log_print, debug_print, error_print};
+use crate::error_print;
 
 /// 应用程序错误类型
 #[derive(Debug)]

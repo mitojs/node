@@ -5,7 +5,7 @@
 			"type": "lldb",
 			"request": "launch",
 			"name": "Agent Debug",
-			"program": "${workspaceFolder}/agent/target/debug/agent",
+			"program": "${workspaceFolder}/agent/target/debug/mitojs-agent",
 			"args": [],
 			"cwd": "${workspaceFolder}/agent",
 			"env": {},

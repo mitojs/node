@@ -6,5 +6,6 @@ export function initConfig() {
 	configMap.set({
 		agentTCPPort: Number(process.env.MITO_AGENT_TCP_PORT) || DEFAULT_TCP_PORT,
 		agentHost: 'localhost',
+		pid: process.pid,
 	})
 }

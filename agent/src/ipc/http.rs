@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tokio::net::{lookup_host, TcpListener};
 use tower_http::cors::CorsLayer;
 
-use crate::helper::config::AppConfig;
+use crate::helper::{config::AppConfig, constants::ListenerResultType};
 
 use crate::{error_print, log_print};
 
@@ -92,17 +92,46 @@ pub async fn create_http_server(
     let listener = TcpListener::bind(addr).await?;
     log_print!("HTTP server running on http://{}", addr);
 
-    // 启动服务器
-    axum::serve(listener, app).await?;
+    // 在后台启动服务器，不阻塞当前函数
+    tokio::spawn(async move {
+        if let Err(e) = axum::serve(listener, app).await {
+            error_print!("HTTP 服务器运行时错误: {}", e);
+        }
+    });
 
+    // 绑定成功后立即返回
     Ok(())
 }
 
-pub async fn start_http_server(config: AppConfig) {
-    log_print!("🌐 启动 HTTP 服务器...");
-    if let Err(e) = create_http_server(&config.tcp.host, config.tcp.port).await {
-        error_print!("HTTP 服务器启动失败: {}", e);
-        // 直接退出进程
-        std::process::exit(1);
+pub async fn start_http_server(
+    config: AppConfig,
+) -> Result<ListenerResultType, ListenerResultType> {
+    match create_http_server(&config.tcp.host, config.tcp.port).await {
+        Ok(()) => {
+            log_print!("HTTP 服务器启动成功");
+            Ok(ListenerResultType::Success)
+        }
+        Err(e) => {
+            error_print!("HTTP 服务器启动失败: {}", e);
+            Err(classify_server_error(&e))
+        }
+    }
+}
+
+/// 分类服务器启动错误
+fn classify_server_error(error: &Box<dyn std::error::Error + Send + Sync>) -> ListenerResultType {
+    // 检查是否是 IO 错误且为端口占用
+    if let Some(io_error) = error.downcast_ref::<std::io::Error>() {
+        return match io_error.kind() {
+            std::io::ErrorKind::AddrInUse => ListenerResultType::AddrInUse,
+            _ => ListenerResultType::FailedReason(error.to_string()),
+        };
+    }
+
+    // 检查错误消息中是否包含端口占用关键词
+    if error.to_string().contains("Address already in use") {
+        ListenerResultType::AddrInUse
+    } else {
+        ListenerResultType::FailedReason(error.to_string())
     }
 }
