@@ -11,12 +11,12 @@ export async function init() {
 
 	try {
 		initConfig()
+		logger.info('mitojs-node init config successfully')
 		// 初始化agent
-		const agent = initAgent()
-		// 通过环境变量传递 TCP 端口启动 agent
-		await agent.start()
-		logger.info('mitojs-node init success')
-		// todo 与 agent 通信
+		await initAgent()
+		logger.info('mitojs-node rust agent started successfully')
+
+		//
 	} catch (error) {
 		logger.error('mitojs-node init error', error)
 	}

@@ -4,6 +4,7 @@ import { arch, platform } from 'node:os'
 import { join } from 'node:path'
 import { configMap } from './config'
 import { logger } from './shared'
+import { type IpcMessage, IpcMessageCode } from './types'
 
 /**
  * 平台和架构映射
@@ -102,14 +103,13 @@ export class MitojsAgent {
 				reject(new Error(`启动 Agent 失败: ${error.message}`))
 			})
 
-			this.process.on('message', (message) => {
-				console.log(message)
-				console.log(`Agent on message`)
-			})
-
-			this.process.on('spawn', () => {
-				logger.info('Agent 进程启动成功')
-				resolve()
+			this.process.on('message', (message: IpcMessage) => {
+				if (message.code === IpcMessageCode.Ok || (message.code === IpcMessageCode.Error && message.message)) {
+					resolve()
+					return
+				}
+				logger.error('Agent start error', message.message)
+				reject(new Error(message.message))
 			})
 
 			this.process.on('exit', (code, signal) => {
@@ -156,13 +156,6 @@ export class MitojsAgent {
 	}
 
 	/**
-	 * 检查进程是否在运行
-	 */
-	isRunning(): boolean {
-		return this.process !== null && !this.process.killed
-	}
-
-	/**
 	 * 获取进程 PID
 	 */
 	getPid(): number | undefined {
@@ -173,6 +166,8 @@ export class MitojsAgent {
 /**
  * 创建 Agent 实例
  */
-export function initAgent(): MitojsAgent {
-	return new MitojsAgent()
+export async function initAgent(): Promise<MitojsAgent> {
+	const agent = new MitojsAgent()
+	await agent.start()
+	return agent
 }
