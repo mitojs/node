@@ -43,6 +43,9 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true,
+			"suspicious": {
+				"noExplicitAny": "info"
+			},
 			"complexity": {
 				"noUselessLoneBlockStatements": "off"
 			}
