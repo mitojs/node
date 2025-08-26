@@ -5,26 +5,20 @@ export interface JsErrorCollectorData {
 }
 
 const DEFAULT_ERR_OBJ = new Error('_')
-export class JsErrorCollector extends BaseCollector<JsErrorCollectorData> {
+export class JsErrorCollector extends BaseCollector<Error> {
 	private _errInfo: Error = DEFAULT_ERR_OBJ
-	private _subscribers: Array<(data: JsErrorCollectorData) => void> = []
+	private _subscribers: Array<(err: Error) => void> = []
 
 	public get() {
-		return {
-			errInfo: this._errInfo,
-		}
+		return this._errInfo
 	}
 
 	private handleError(err: Error) {
 		this._errInfo = err
-		this._subscribers.forEach((cb) =>
-			cb({
-				errInfo: err,
-			})
-		)
+		this._subscribers.forEach((cb) => cb(err))
 	}
 
-	subscribe(cb: (data: JsErrorCollectorData) => void): void {
+	subscribe(cb: (err: Error) => void): void {
 		this._subscribers.push(cb)
 	}
 
