@@ -1,16 +1,23 @@
 import { cpuUsage, hrtime } from 'node:process'
+import { BaseCollector } from './base'
 
-export class CPUCollector {
+export interface CPUData {
+	load: number
+	useLoad: number
+}
+
+export class CPUCollector extends BaseCollector<CPUData> {
 	private _lastHrtime: bigint
 	private _lastCpuUsage: NodeJS.CpuUsage
 	constructor() {
+		super()
 		// nanoseconds
 		this._lastHrtime = hrtime.bigint()
 		// microsecond
 		this._lastCpuUsage = cpuUsage()
 	}
 
-	public getData() {
+	public get() {
 		const currentCpuUsage = cpuUsage()
 		// nanoseconds 转成 microsecond
 		const timeDiff = Number(hrtime.bigint() - this._lastHrtime) / 1e3
@@ -25,6 +32,15 @@ export class CPUCollector {
 		return {
 			load,
 			useLoad,
+		}
+	}
+
+	destroy() {
+		super.destroy()
+		this._lastHrtime = 0n
+		this._lastCpuUsage = {
+			user: 0,
+			system: 0,
 		}
 	}
 }

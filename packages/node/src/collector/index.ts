@@ -1,2 +1,3 @@
-export { CPUCollector } from './cpu'
-export { MemoryCollector } from './memory'
+export type { BaseCollector } from './base'
+export { CPUCollector, type CPUData } from './cpu'
+export { MemoryCollector, type MemoryData } from './memory'

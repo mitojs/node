@@ -1,13 +1,15 @@
 import { memoryUsage } from 'node:process'
 import { getHeapSpaceStatistics, getHeapStatistics, type HeapInfo, type HeapSpaceInfo } from 'node:v8'
+import { BaseCollector } from './base'
 
 export interface MemoryData {
 	heapInfo: HeapInfo
 	heapSpaces: HeapSpaceInfo[]
 	memory: NodeJS.MemoryUsage
 }
-export class MemoryCollector {
-	public getData(): MemoryData {
+
+export class MemoryCollector extends BaseCollector<MemoryData> {
+	public get() {
 		const heapInfo = getHeapStatistics()
 		const heapSpaces = getHeapSpaceStatistics()
 		return {
@@ -15,19 +17,5 @@ export class MemoryCollector {
 			heapSpaces,
 			memory: memoryUsage(),
 		}
-		// 	heapSpaces.map((item) => {
-		// 		item.space_name
-		// 		item.space_size
-		// 		item.space_used_size
-		// 		item.space_available_size
-		// 		item.physical_space_size
-		// 	})
-		// 	const memory = memoryUsage()
-		// 	memory.rss
-		// 	memory.heapTotal
-		// 	memory.heapUsed
-		// 	memory.external
-		// 	memory.arrayBuffers
-		// }
 	}
 }
