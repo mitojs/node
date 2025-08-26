@@ -1,5 +1,4 @@
 import { initAgent } from './binary'
-import { configMap } from './config'
 import { initConfig } from './init'
 import { logger, MITO_NODE } from './shared'
 
