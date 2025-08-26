@@ -7,6 +7,8 @@ export abstract class BaseCollector<T> {
 	}
 
 	abstract get(): T
+
+	// 只有监听和劫持类的才需要订阅函数
 	subscribe?(cb: (data: T) => void): void
 
 	//  外界不允许手动 监听，只能通过 constructor 来 监听
