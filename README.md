@@ -1,5 +1,6 @@
-# work in progress
-正在开发中。。。
+# work in progress 🚧
+正在开发中，感兴趣可以加入我们
+![飞书群](./docs/lark_group.jpg)
 
 # MitoJS Node(README 由 AI 生成)
 一个强大的 Node.js 性能监控和调试工具套件，提供实时性能分析、内存监控和代码调试功能。
