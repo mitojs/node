@@ -2,9 +2,10 @@ import { unwrap, wrap } from '../shared/shimmer'
 import { getStackFilePath } from '../shared/stack'
 import { BaseCollector } from './base'
 
-type TimeoutTypes = 'setTimeout' | 'setInterval'
 const TIMER_DESTROYED_KEY = '_destroyed'
+const TIMEOUTS = ['setTimeout', 'setInterval'] as const
 
+type TimeoutTypes = 'setTimeout' | 'setInterval'
 type Timer = NodeJS.Timer & {
 	[TIMER_DESTROYED_KEY]: boolean
 }
@@ -14,8 +15,6 @@ type TimeoutInfo = {
 	timer: Timer
 }
 export type TimeoutData = Map<number, TimeoutInfo>
-
-const TIMEOUTS = ['setTimeout', 'setInterval'] as const
 export class TimeoutCollector extends BaseCollector<TimeoutData> {
 	private _timeoutMap: Map<number, TimeoutInfo> = new Map()
 

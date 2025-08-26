@@ -1,9 +1,5 @@
 import { BaseCollector } from './base'
 
-export interface JsErrorCollectorData {
-	errInfo: Error
-}
-
 const DEFAULT_ERR_OBJ = new Error('_')
 export class JsErrorCollector extends BaseCollector<Error> {
 	private _errInfo: Error = DEFAULT_ERR_OBJ
