@@ -75,8 +75,8 @@ async fn update_process(
     Ok(ResponseJson(response))
 }
 
-// 创建 HTTP 服务器
-pub async fn create_http_server(
+// 设置并启动 HTTP 服务器
+pub async fn setup_http_server(
     host: &str,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -129,7 +129,7 @@ fn classify_server_error(error: &Box<dyn std::error::Error + Send + Sync>) -> Li
 
 pub async fn start_http_server(config: AppConfig) {
     tokio::spawn(async move {
-        match create_http_server(&config.tcp.host, config.tcp.port).await {
+        match setup_http_server(&config.tcp.host, config.tcp.port).await {
             Ok(()) => {
                 log_print!("HTTP 服务器启动成功");
                 let message = IpcMessage {

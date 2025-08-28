@@ -5,9 +5,10 @@ use crate::{
         ActionType, BaseCommandData, CommandType, MetricType, ProcessActionInfo, ProcessMetricInfo,
     },
     ipc::tcp::DataCallback,
-    {log_print, debug_print, error_print},
+    {error_print, log_print},
 };
 
+/// 监听 UDS 的数据通信回调
 pub fn data_subscription() -> DataCallback {
     Arc::new(|data: &str| {
         if data.trim().is_empty() {

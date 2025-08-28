@@ -6,8 +6,9 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::net::UnixStream;
 use tokio::task;
 
+use crate::data_processor::subscribe::data_subscription;
 // 导入宏
-use crate::{log_print, debug_print, error_print};
+use crate::{error_print, log_print};
 
 // 定义回调函数类型
 // 一定要加 dyn，
@@ -22,6 +23,7 @@ pub struct UdsSocket {
     pub socket_path: PathBuf,
 }
 
+// UDS 适合在本地进程间通信，性能好
 impl UdsSocket {
     pub fn new(socket_path: PathBuf) -> Result<Self, std::io::Error> {
         // 如果 socket 文件已存在，先删除它
@@ -111,4 +113,10 @@ impl Drop for UdsSocket {
             log_print!("UDS socket 文件已移除");
         }
     }
+}
+
+pub async fn setup_uds_server(socket_path: PathBuf) -> Result<UdsSocket, std::io::Error> {
+    let uds_socket = UdsSocket::new(socket_path)?;
+    uds_socket.set_callback(data_subscription());
+    Ok(uds_socket)
 }

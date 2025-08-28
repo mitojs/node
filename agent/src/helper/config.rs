@@ -51,7 +51,7 @@ impl AppConfig {
             config.tcp.host = host;
         }
 
-        // 在当前目录下创建 agent 目录
+        // todo 在当前目录下创建 agent 目录，如果不行则在 tmp 下创建目录
         config.agent_dir = std::env::current_dir()
             .unwrap()
             .join(AGENT_DIR)
