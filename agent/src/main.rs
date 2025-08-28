@@ -13,16 +13,12 @@ use tokio::signal;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     log_print!("🚀 Agent 启动中...");
-
     let config: AppConfig = AppConfig::new();
 
     // 验证配置
     config
         .validate()
         .map_err(|e| format!("配置验证失败: {}", e))?;
-
-    // 初始化日志
-    init_logging(&config);
 
     config.print_config();
 
@@ -54,9 +50,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     log_print!("✅ Agent 已优雅关闭");
     Ok(())
-}
-
-fn init_logging(_config: &AppConfig) {
-    // 简单的日志初始化，可以根据需要替换为更完整的日志系统
-    log_print!("📝 日志系统初始化完成");
 }
