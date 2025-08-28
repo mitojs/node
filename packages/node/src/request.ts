@@ -6,6 +6,7 @@ const getAgentRequestBasePath = () => `http://${configMap.get('agentHost')}:${co
 
 const AGENT_REQUEST_REGISTER_PROCESS_PATH = '/ipc/register_process'
 const AGENT_REQUEST_UPDATE_PROCESS_PATH = '/ipc/update_process'
+const AGENT_REQUEST_GET_UDS_PATH = '/ipc/get_uds_path'
 
 export async function requestToAgent<T>(path: string, options: FetchOptions) {
 	return retry<T>(async () => {
@@ -25,5 +26,11 @@ export async function updateProcessToAgent(data: RegisterProcessData) {
 	return requestToAgent<{ code: number; message: string }>(AGENT_REQUEST_UPDATE_PROCESS_PATH, {
 		method: 'POST',
 		body: JSON.stringify(data),
+	})
+}
+
+export async function getUDSPathFromAgent() {
+	return requestToAgent<{ code: number; message: string; data: { uds_path: string } }>(AGENT_REQUEST_GET_UDS_PATH, {
+		method: 'GET',
 	})
 }

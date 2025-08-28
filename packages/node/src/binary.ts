@@ -3,8 +3,8 @@ import { existsSync } from 'node:fs'
 import { arch, platform } from 'node:os'
 import { join } from 'node:path'
 import { configMap } from './config'
-import { logger } from './shared'
-import { type IpcMessage, IpcMessageCode } from './types'
+import { IpcMessageCode, logger } from './shared'
+import type { IpcMessage } from './types'
 
 /**
  * 平台和架构映射

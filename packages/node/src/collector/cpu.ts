@@ -18,6 +18,7 @@ export class CPUCollector extends BaseCollector<CPUData> {
 	}
 
 	public get() {
+		// todo 通过 Rust 获取 getThreadCPUUsage
 		const currentCpuUsage = cpuUsage()
 		// nanoseconds 转成 microsecond
 		const timeDiff = Number(hrtime.bigint() - this._lastHrtime) / 1e3

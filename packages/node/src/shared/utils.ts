@@ -1,7 +1,10 @@
 import * as http from 'node:http'
 import * as https from 'node:https'
+import os from 'node:os'
 import { setTimeout } from 'node:timers/promises'
 import { URL } from 'node:url'
+import { configMap } from '../config'
+import { logger } from './logger'
 
 interface RetryOptions {
 	retry?: number
@@ -114,4 +117,38 @@ export function easyFetch(url: string, options: FetchOptions = {}): Promise<Fetc
 
 		req.end()
 	})
+}
+
+// See https://nodejs.org/docs/latest/api/net.html#ipc-support
+const MAX_SOCK_PATH_LEN = os.platform() === 'linux' ? 107 : 103 // linux and mac
+export function getSockPath(baseSockName: string) {
+	let sockPath = `${configMap.get('dir')}/${baseSockName}`
+	logger.info(`original socket path: ${sockPath}`)
+	if (sockPath.length > MAX_SOCK_PATH_LEN) {
+		sockPath = `${process.cwd()}/${baseSockName}`
+		if (sockPath.length > MAX_SOCK_PATH_LEN) {
+			sockPath = `${os.tmpdir()}/${baseSockName}`
+		}
+	}
+	logger.info(`unix domain sock path: ${sockPath}`)
+	return sockPath
+}
+
+export function getRandomString(len: number) {
+	const str = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz'
+	const strlen = str.length
+	let result = ''
+	for (let i = 0; i < len; i++) {
+		const index = ~~(Math.random() * strlen)
+		result += `${str[index]}`
+	}
+	return result
+}
+
+export function callWithinTryCatch<T = any>(fn: Function, ...args: any[]) {
+	try {
+		return fn(...args) as T
+	} catch (e) {
+		logger.error('callWithinTryCatch error', e)
+	}
 }

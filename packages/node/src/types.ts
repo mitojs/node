@@ -1,7 +1,10 @@
+import type { IpcMessageCode, ListenerResultType, SubjectNames } from './shared'
+
 export interface ConfigType {
 	agentTCPPort: number
 	agentHost: string
 	pid: number
+	dir: string
 }
 
 export interface RegisterProcessData {
@@ -9,17 +12,15 @@ export interface RegisterProcessData {
 	udsPath: string
 }
 
-export enum IpcMessageCode {
-	Ok = 200,
-	Error = 500,
-}
-
-enum ListenerResultType {
-	Success = 'success',
-	AddrInUse = 'addr_in_use',
-}
-
 export interface IpcMessage {
 	code: IpcMessageCode
 	message: ListenerResultType | string
+}
+
+export interface MitoNodeOption {
+	metrics?: {
+		[SubjectNames.CPU]?: boolean
+		[SubjectNames.Memory]?: boolean
+		[SubjectNames.JSError]?: boolean
+	}
 }

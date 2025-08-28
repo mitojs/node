@@ -1,9 +1,10 @@
 import type { Subscription } from 'rxjs'
 import { initAgent } from './binary'
-import { initConfig, initUDSServer } from './init'
+import { DEFAULT_MITO_NODE_OPTION, initConfig, initHttpServer, initOption } from './init'
 import { logger, MITO_NODE } from './shared'
 import { CPUSubject, JSErrorSubject, MemorySubject } from './subjects'
 import type { BaseMonitoringSubject } from './subjects/base'
+import type { MitoNodeOption } from './types'
 
 function initSubjects() {
 	// todo 这里的插件可以通过参数来传入
@@ -43,8 +44,10 @@ function initSubjects() {
 }
 
 export class MitoNode {
-	constructor() {
+	private _options: MitoNodeOption = DEFAULT_MITO_NODE_OPTION
+	constructor(options?: MitoNodeOption) {
 		initConfig()
+		this._options = initOption(options)
 	}
 
 	async start() {
@@ -57,12 +60,12 @@ export class MitoNode {
 			// 初始化agent
 			await initAgent()
 			logger.info('rust agent started successfully')
-			await initUDSServer()
-			logger.info('uds server established successfully')
+			const server = await initHttpServer()
+			logger.info('http server established successfully', server.address())
 			// await this.registerProcessToAgent();
 			// 初始化 subject ，可动态配置开启和关闭，并通过 uds 传输给 rust agent
 			// 初始化插件
-			const unsubscribe = initSubjects()
+			// const unsubscribe = initSubjects()
 		} catch (error) {
 			logger.error('init error', error)
 		}
