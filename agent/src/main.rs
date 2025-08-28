@@ -28,22 +28,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config_clone = config.clone();
 
-    let http_handle = tokio::spawn(async move {
+    tokio::spawn(async move {
         match http::start_http_server(config_clone).await {
             Ok(listener_result) => {
                 let message = IpcMessage {
                     code: IpcMessageCode::Ok,
                     message: listener_result.to_string(),
                 };
-                send_ipc_message(message).unwrap();
+                send_ipc_message(message);
             }
             Err(listener_result) => {
                 let message = IpcMessage {
                     code: IpcMessageCode::Err,
                     message: listener_result.to_string(),
                 };
-                send_ipc_message(message).unwrap();
-                return;
+                send_ipc_message(message);
             }
         }
     });
@@ -51,9 +50,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::select! {
         _ = signal::ctrl_c() => {
             log_print!("\n🛑 收到 Ctrl+C 信号，正在关闭...");
-        }
-        _ = http_handle => {
-            log_print!("HTTP 服务器已退出");
         }
     }
     log_print!("✅ Agent 已优雅关闭");

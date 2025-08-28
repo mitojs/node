@@ -1,18 +1,28 @@
-import fs from 'node:fs'
-import http from 'node:http'
+import path, { resolve } from 'node:path'
+import { SHARE_ENV, Worker } from 'node:worker_threads'
 import deepMerge from 'deepmerge'
 import { configMap } from './config'
-import { getUDSPathFromAgent, registerProcessToAgent } from './request'
 import {
-	callWithinTryCatch,
 	DEFAULT_TCP_PORT,
-	getRandomString,
-	getSockPath,
+	IpcMessageCode,
+	isMainThread,
+	isSupportInspectWorker,
+	isSupportWorker,
 	logger,
-	retry,
+	MITO_NODE,
 	SubjectNames,
 } from './shared'
-import type { MitoNodeOption } from './types'
+import type { IpcMessage, MitoNodeOption } from './types'
+
+export function preCheck() {
+	if (global[MITO_NODE]) {
+		throw new Error('has been initialized')
+	}
+	if (!isMainThread) {
+		throw new Error('mitojs-node only support in main thread')
+	}
+	global[MITO_NODE] = true
+}
 
 export function initConfig() {
 	configMap.update({
@@ -34,47 +44,55 @@ export function initOption(option?: MitoNodeOption) {
 	return deepMerge(DEFAULT_MITO_NODE_OPTION, option || {})
 }
 
-/**
- * 用来接收 Rust Agent 下发的指令
- * @returns
- */
-export async function initHttpServer(): Promise<http.Server> {
-	let currentPort = DEFAULT_TCP_PORT + 1
-	return retry<http.Server>(
-		() => {
-			return new Promise((resolve, reject) => {
-				const errorHandler = (err: Error) => {
-					logger.error('init http server error', err)
-					currentPort++ // 每次重试时端口自增 1
-					reject(err)
-				}
-				const server = http.createServer()
-				server.listen(
-					{
-						port: currentPort,
-						// 独占监听
-						exclusive: true,
-					},
-					() => {
-						server.off('error', errorHandler)
-						server.on('close', () => {
-							logger.info('http server closed')
-						})
-						// todo 处理 agent 下发的请求
-						server.on('request', (req, res) => {
-							logger.info('request', req, res)
-						})
-						server.on('upgrade', (req, socket, head) => {
-							logger.info('upgrade', req, socket, head)
-						})
-						resolve(server)
-					}
-				)
-				server.on('error', errorHandler)
-			})
-		},
-		{ retry: 5, delayTime: 1000 }
-	)
+export async function initProxyThread() {
+	return new Promise((resolve, reject) => {
+		if (!isSupportWorker || !isSupportInspectWorker) {
+			logger.info(
+				'It would not enable proxy thread because current Node.js version do not support connectToMainThread API'
+			)
+			return
+		}
+
+		const filepath = path.resolve(__dirname, './proxy_thread/index.js')
+		const worker = new Worker(filepath, {
+			workerData: {
+				// here should use JSON.stringify to keep the data type,
+				// otherwise, number will be transformed to string in worker
+				MITO_NODE_CONFIG: JSON.stringify(configMap.get()),
+			},
+			// worker share the env with main thread
+			env: SHARE_ENV,
+		})
+		worker.unref()
+		const terminate = () => {
+			worker?.terminate()
+		}
+		const onError = (err: Error) => {
+			terminate()
+			reject(new Error(`proxy thread error: ${err.message}`))
+		}
+		const onExit = (code: number) => {
+			terminate()
+			reject(new Error(`proxy thread exits with code: ${code}`))
+		}
+		worker.on('error', onError)
+		worker.on('exit', onExit)
+		worker.on('message', (message: IpcMessage) => {
+			worker.off('error', onError)
+			worker.off('exit', onExit)
+			if (message.code === IpcMessageCode.Ok) {
+				worker.on('error', (err) => {
+					logger.info(`worker error: ${err.message}`)
+				})
+				worker.on('exit', (exitCode) => {
+					logger.info(`worker exit with code: ${exitCode}`)
+				})
+				resolve(worker)
+			} else {
+				onError(new Error(message.message))
+			}
+		})
+	})
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { Subscription } from 'rxjs'
 import { initAgent } from './binary'
-import { DEFAULT_MITO_NODE_OPTION, initConfig, initHttpServer, initOption } from './init'
-import { logger, MITO_NODE } from './shared'
+import { DEFAULT_MITO_NODE_OPTION, initConfig, initOption, initProxyThread, preCheck } from './init'
+import { logger } from './shared'
 import { CPUSubject, JSErrorSubject, MemorySubject } from './subjects'
 import type { BaseMonitoringSubject } from './subjects/base'
 import type { MitoNodeOption } from './types'
@@ -51,23 +51,20 @@ export class MitoNode {
 	}
 
 	async start() {
-		if (global[MITO_NODE]) {
-			logger.error('has been initialized')
-			return
-		}
-		global[MITO_NODE] = true
+		preCheck()
 		try {
 			// 初始化agent
 			await initAgent()
 			logger.info('rust agent started successfully')
-			const server = await initHttpServer()
-			logger.info('http server established successfully', server.address())
+			// 通过 work_thread
+
+			await initProxyThread()
 			// await this.registerProcessToAgent();
 			// 初始化 subject ，可动态配置开启和关闭，并通过 uds 传输给 rust agent
 			// 初始化插件
 			// const unsubscribe = initSubjects()
 		} catch (error) {
-			logger.error('init error', error)
+			logger.error('start MitoNode error', error)
 		}
 	}
 
@@ -78,3 +75,5 @@ export class MitoNode {
 
 const mitoNode = new MitoNode()
 mitoNode.start()
+
+setTimeout(() => {}, 1000000)

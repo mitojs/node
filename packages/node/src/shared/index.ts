@@ -1,3 +1,5 @@
 export * from './constants'
+export * from './http'
+export * from './is'
 export * from './logger'
 export * from './utils'

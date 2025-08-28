@@ -11,8 +11,17 @@ pub enum ListenerResultType {
     FailedReason(String),
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Copy, Clone)]
 pub enum IpcMessageCode {
     Ok = 200,
     Err = 500,
+}
+
+impl serde::Serialize for IpcMessageCode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_i32(*self as i32)
+    }
 }
