@@ -1,3 +1,3 @@
-export { BaseMonitoringSubject } from './base'
-export { CPUSubject } from './cpu'
-export { MemorySubject } from './memory'
+export * from './cpu'
+export * from './js-error'
+export * from './memory'

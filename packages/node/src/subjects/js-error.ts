@@ -1,13 +1,14 @@
 import type { BaseCollector } from '../collector/base'
-import { CPUCollector, type CPUData } from '../collector/cpu'
+import { JsErrorCollector } from '../collector/js-error'
+import { SubjectNames } from '../shared'
 import { BaseMonitoringSubject } from './base'
 
-export class JSErrorSubject extends BaseMonitoringSubject<CPUData> {
-	protected createCollector(): BaseCollector<CPUData> {
-		return new CPUCollector()
+export class JSErrorSubject extends BaseMonitoringSubject<Error> {
+	protected createCollector(): BaseCollector<Error> {
+		return new JsErrorCollector()
 	}
 
-	protected getSubjectName(): string {
-		return 'JSErrorSubject'
+	getSubjectName() {
+		return SubjectNames.JSError
 	}
 }

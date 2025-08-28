@@ -1,4 +1,4 @@
 export const logger = {
-	info: console.info,
-	error: console.error,
+	info: (...args: any[]) => console.info('[mitojs-node]:', ...args),
+	error: (...args: any[]) => console.error('[mitojs-node error]:', ...args),
 }

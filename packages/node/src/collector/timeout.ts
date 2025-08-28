@@ -18,7 +18,8 @@ export type TimeoutData = Map<number, TimeoutInfo>
 export class TimeoutCollector extends BaseCollector<TimeoutData> {
 	private _timeoutMap: Map<number, TimeoutInfo> = new Map()
 
-	hook() {
+	// 劫持 setTimeout 和 setInterval
+	listen() {
 		let id = 0
 		const that = this
 		const wrapFn = (originalSetTimeout: typeof setTimeout | typeof setInterval, name: TimeoutTypes) => {

@@ -1,12 +1,17 @@
 import { BaseCollector } from './base'
 
-const DEFAULT_ERR_OBJ = new Error('_')
 export class JsErrorCollector extends BaseCollector<Error> {
-	private _errInfo: Error = DEFAULT_ERR_OBJ
+	private _errInfo: Error | undefined = undefined
 	private _subscribers: Array<(err: Error) => void> = []
 
 	public get() {
-		return this._errInfo
+		if (this._errInfo) {
+			// 获取一次后
+			const err = this._errInfo
+			this._errInfo = undefined
+			return err
+		}
+		return undefined
 	}
 
 	private handleError(err: Error) {
@@ -30,6 +35,6 @@ export class JsErrorCollector extends BaseCollector<Error> {
 	destroy(): void {
 		super.destroy()
 		this._subscribers.length = 0
-		this._errInfo = DEFAULT_ERR_OBJ
+		this._errInfo = undefined
 	}
 }

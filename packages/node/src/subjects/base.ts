@@ -1,18 +1,18 @@
 import type { BaseCollector } from '../collector/base'
-import { logger } from '../shared'
+import { logger, type SubjectNames } from '../shared'
 import { ReactiveSubject } from '../shared/ReactiveSubject'
 
 /**
  * Base class for monitoring subjects that collect data at regular intervals
  */
 export abstract class BaseMonitoringSubject<T> extends ReactiveSubject<T> {
-	protected _interval: number = 5000
+	protected _interval: number
 	protected _timer: NodeJS.Timeout | null = null
 	protected collector: BaseCollector<T> | null = null
 
-	constructor({ interval }: { interval: number }) {
+	constructor(options?: { interval: number }) {
 		super()
-		this._interval = interval
+		this._interval = options?.interval || 5000
 		this.collector = this.createCollector()
 		this.addTearDown(() => {
 			this.teardown()
@@ -25,9 +25,9 @@ export abstract class BaseMonitoringSubject<T> extends ReactiveSubject<T> {
 	protected abstract createCollector(): BaseCollector<T>
 
 	/**
-	 * Get the subject name for logging purposes
+	 * Get the subject name
 	 */
-	protected abstract getSubjectName(): string
+	abstract getSubjectName(): SubjectNames
 
 	getCollector() {
 		return this.collector
@@ -36,23 +36,21 @@ export abstract class BaseMonitoringSubject<T> extends ReactiveSubject<T> {
 	/**
 	 * Start the monitoring timer
 	 */
-	start() {
+	start(options?: { interval: number }) {
+		if (options?.interval) {
+			this._interval = options.interval
+		}
+		this.clearTimer()
 		if (this.closed) {
 			logger.error(`${this.getSubjectName()} start error, subject is closed`)
 			return
 		}
 		this._timer = setInterval(() => {
-			this.next(this.collector!.get())
+			const data = this.collector!.get()
+			if (data) {
+				this.next(data)
+			}
 		}, this._interval)
-	}
-
-	/**
-	 * Update the interval and restart the monitoring
-	 */
-	updateAndRestart(options: { interval: number }) {
-		this._interval = options.interval
-		this.clearTimer()
-		this.start()
 	}
 
 	/**

@@ -1,5 +1,6 @@
 import type { BaseCollector } from '../collector/base'
 import { MemoryCollector, type MemoryData } from '../collector/memory'
+import { SubjectNames } from '../shared'
 import { BaseMonitoringSubject } from './base'
 
 export class MemorySubject extends BaseMonitoringSubject<MemoryData> {
@@ -7,7 +8,7 @@ export class MemorySubject extends BaseMonitoringSubject<MemoryData> {
 		return new MemoryCollector()
 	}
 
-	protected getSubjectName(): string {
-		return 'MemorySubject'
+	getSubjectName() {
+		return SubjectNames.Memory
 	}
 }

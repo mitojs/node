@@ -1,5 +1,6 @@
 import type { BaseCollector } from '../collector/base'
 import { CPUCollector, type CPUData } from '../collector/cpu'
+import { SubjectNames } from '../shared'
 import { BaseMonitoringSubject } from './base'
 
 export class CPUSubject extends BaseMonitoringSubject<CPUData> {
@@ -7,7 +8,7 @@ export class CPUSubject extends BaseMonitoringSubject<CPUData> {
 		return new CPUCollector()
 	}
 
-	protected getSubjectName(): string {
-		return 'CPUSubject'
+	getSubjectName() {
+		return SubjectNames.CPU
 	}
 }
