@@ -9,7 +9,13 @@ use serde::{Deserialize, Serialize};
 use tokio::net::{lookup_host, TcpListener};
 use tower_http::cors::CorsLayer;
 
-use crate::helper::{config::AppConfig, constants::ListenerResultType};
+use crate::{
+    helper::{
+        config::AppConfig,
+        constants::{IpcMessageCode, ListenerResultType},
+    },
+    ipc::process::{send_ipc_message, IpcMessage},
+};
 
 use crate::{error_print, log_print};
 
@@ -103,21 +109,6 @@ pub async fn create_http_server(
     Ok(())
 }
 
-pub async fn start_http_server(
-    config: AppConfig,
-) -> Result<ListenerResultType, ListenerResultType> {
-    match create_http_server(&config.tcp.host, config.tcp.port).await {
-        Ok(()) => {
-            log_print!("HTTP 服务器启动成功");
-            Ok(ListenerResultType::Success)
-        }
-        Err(e) => {
-            error_print!("HTTP 服务器启动失败: {}", e);
-            Err(classify_server_error(&e))
-        }
-    }
-}
-
 /// 分类服务器启动错误
 fn classify_server_error(error: &Box<dyn std::error::Error + Send + Sync>) -> ListenerResultType {
     // 检查是否是 IO 错误且为端口占用
@@ -134,4 +125,27 @@ fn classify_server_error(error: &Box<dyn std::error::Error + Send + Sync>) -> Li
     } else {
         ListenerResultType::FailedReason(error.to_string())
     }
+}
+
+pub async fn start_http_server(config: AppConfig) {
+    tokio::spawn(async move {
+        match create_http_server(&config.tcp.host, config.tcp.port).await {
+            Ok(()) => {
+                log_print!("HTTP 服务器启动成功");
+                let message = IpcMessage {
+                    code: IpcMessageCode::Ok,
+                    message: ListenerResultType::Success.to_string(),
+                };
+                send_ipc_message(message);
+            }
+            Err(e) => {
+                error_print!("HTTP 服务器启动失败: {}", e);
+                let message = IpcMessage {
+                    code: IpcMessageCode::Err,
+                    message: classify_server_error(&e).to_string(),
+                };
+                send_ipc_message(message);
+            }
+        }
+    });
 }

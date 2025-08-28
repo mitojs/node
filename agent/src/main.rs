@@ -5,9 +5,7 @@ mod ipc;
 mod marco;
 
 use crate::helper::config::AppConfig;
-use crate::helper::constants::IpcMessageCode;
 use crate::ipc::http;
-use crate::ipc::process::{send_ipc_message, IpcMessage};
 use tokio::signal;
 
 #[tokio::main]
@@ -24,24 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config_clone = config.clone();
 
-    tokio::spawn(async move {
-        match http::start_http_server(config_clone).await {
-            Ok(listener_result) => {
-                let message = IpcMessage {
-                    code: IpcMessageCode::Ok,
-                    message: listener_result.to_string(),
-                };
-                send_ipc_message(message);
-            }
-            Err(listener_result) => {
-                let message = IpcMessage {
-                    code: IpcMessageCode::Err,
-                    message: listener_result.to_string(),
-                };
-                send_ipc_message(message);
-            }
-        }
-    });
+    http::start_http_server(config_clone).await;
 
     tokio::select! {
         _ = signal::ctrl_c() => {
