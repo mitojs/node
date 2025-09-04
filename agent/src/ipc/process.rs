@@ -33,6 +33,6 @@ pub fn write_message_for_ipc(message: IpcMessage) -> io::Result<()> {
 pub fn send_ipc_message(message: IpcMessage) {
     if let Err(_) = write_message_for_ipc(message) {
         error_print!("write message for ipc failed");
-        std::process::exit(1);
+        // std::process::exit(1);
     }
 }

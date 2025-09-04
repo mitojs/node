@@ -1,11 +1,4 @@
-use axum::{
-    extract::Json,
-    http::StatusCode,
-    response::Json as ResponseJson,
-    routing::{get, post},
-    Router,
-};
-use serde::{Deserialize, Serialize};
+use axum::{routing::get, Router};
 use tokio::net::{lookup_host, TcpListener};
 use tower_http::cors::CorsLayer;
 
@@ -19,60 +12,15 @@ use crate::{
 
 use crate::{error_print, log_print};
 
-#[derive(Serialize)]
-struct InfoResponse {
-    name: String,
-    version: String,
-    status: String,
-}
-
-#[derive(Deserialize)]
-struct UpdateProcessRequest {
-    process_id: Option<u32>,
-    action: String,
-    data: Option<serde_json::Value>,
-}
-
-#[derive(Serialize)]
-struct UpdateProcessResponse {
-    success: bool,
-    message: String,
-}
+use super::{
+    common::BaseRouter,
+    endpoints::{
+        heartbeat::HEARTBEAT_ROUTER, info::INFO_ROUTER, update_process::UPDATE_PROCESS_ROUTER,
+    },
+};
 
 pub async fn get_agent_name() -> &'static str {
     "mitojs-agent"
-}
-
-// GET /info 接口处理函数
-async fn get_info() -> ResponseJson<InfoResponse> {
-    let info = InfoResponse {
-        name: "mitojs-agent".to_string(),
-        version: "0.1.0".to_string(),
-        status: "running".to_string(),
-    };
-    ResponseJson(info)
-}
-
-// POST /update_process 接口处理函数
-async fn update_process(
-    Json(payload): Json<UpdateProcessRequest>,
-) -> Result<ResponseJson<UpdateProcessResponse>, StatusCode> {
-    // 这里可以根据实际需求处理进程更新逻辑
-    log_print!("Received update_process request: {:?}", payload.action);
-
-    // 模拟处理逻辑
-    let response = match payload.action.as_str() {
-        "start" | "stop" | "restart" => UpdateProcessResponse {
-            success: true,
-            message: format!("Process {} executed successfully", payload.action),
-        },
-        _ => UpdateProcessResponse {
-            success: false,
-            message: "Unknown action".to_string(),
-        },
-    };
-
-    Ok(ResponseJson(response))
 }
 
 // 设置并启动 HTTP 服务器
@@ -80,12 +28,15 @@ pub async fn setup_http_server(
     host: &str,
     port: u16,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // 创建路由
-    let app = Router::new()
+    // 路由集合
+    let mut app = Router::new()
         .route("/", get(get_agent_name))
-        .route("/info", get(get_info))
-        .route("/update_process", post(update_process))
         .layer(CorsLayer::permissive()); // CORS 支持
+
+    const ROUTERS: [&dyn BaseRouter; 3] = [&INFO_ROUTER, &UPDATE_PROCESS_ROUTER, &HEARTBEAT_ROUTER];
+    for router in ROUTERS {
+        app = app.route(router.get_path(), (router.get_handler())());
+    }
 
     // 绑定地址
     log_print!("before bind  addr: {}:{}", host, port);

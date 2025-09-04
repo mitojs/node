@@ -4,6 +4,7 @@ mod ipc;
 #[macro_use]
 mod marco;
 
+use crate::data_processor::store::{ProcessStore, PROCESS_MAP_STORE};
 use crate::helper::config::AppConfig;
 use crate::ipc::http;
 use tokio::signal;
@@ -22,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config_clone = config.clone();
 
-    http::start_http_server(config_clone).await;
+    http::http::start_http_server(config_clone).await;
 
     tokio::select! {
         _ = signal::ctrl_c() => {
