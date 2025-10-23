@@ -7,9 +7,5 @@
 		"moduleResolution": "node16"
 	},
 	"include": ["src/**/*.ts", "src/**/*.tsx"],
-	"references": [
-		{
-			"path": "../shared"
-		}
-	]
+	"references": []
 }
