@@ -14,3 +14,10 @@ export interface CLIRuntimeOptions {
 	port: number
 	cmd: AllCommandOptions
 }
+
+// 用户可操作的状态枚举
+export enum Steps {
+	SelectPid = 'SelectPid',
+	SelectCommand = 'SelectCommand',
+	Running = 'Running',
+}
