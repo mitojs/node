@@ -1,19 +1,11 @@
 #!/usr/bin/env node
-import { execSync } from 'child_process'
 import { Box, render, Text, useApp, useInput } from 'ink'
 import { useEffect, useState } from 'react'
 import { CLI } from './cli.js'
 import { COMMAND_CONFIGS, COMMAND_TYPE } from './constants.js'
+import { getNodeProcesses, type NodeProcess } from './shared/command.js'
 import { Steps } from './types/cli.js'
 import type { AllCommandOptions } from './types/commands.js'
-
-interface NodeProcess {
-	pid: number
-	ppid: number
-	stime: string
-	time: string
-	command: string
-}
 
 interface AppState {
 	step: Steps
@@ -23,34 +15,6 @@ interface AppState {
 	selectedCommandIndex: number
 	selectedCommand: COMMAND_TYPE | null
 	error: string | null
-}
-
-function getNodeProcesses(): NodeProcess[] {
-	try {
-		// 使用 pgrep 获取 Node.js 进程 PID，然后用 ps 获取详细信息
-		const pids = execSync('pgrep node', { encoding: 'utf8' }).trim()
-		if (!pids) {
-			return []
-		}
-
-		const output = execSync(`ps -fxp ${pids.split('\n').join(' ')}`, { encoding: 'utf8' })
-		const lines = output.trim().split('\n').slice(1) // 跳过标题行
-
-		return lines
-			.map((line) => {
-				const parts = line.trim().split(/\s+/)
-				const pid = parseInt(parts[1])
-				const ppid = parseInt(parts[2])
-				const stime = parts[4]
-				const time = parts[6]
-				const command = parts.slice(7).join(' ') // ps -f 格式中命令从第8列开始
-
-				return { pid, ppid, stime, time, command }
-			})
-			.filter((proc) => proc.pid && !isNaN(proc.pid))
-	} catch (error) {
-		return []
-	}
 }
 
 function InteractiveCLI() {

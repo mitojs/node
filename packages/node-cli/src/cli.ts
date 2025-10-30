@@ -128,19 +128,21 @@ export class CLI extends EventEmitter {
 				})
 				res.on('end', () => {
 					try {
-						/**
-                         * [
-                                {
-                                    "description": "",
-                                    "devtoolsFrontendUrl": "/devtools/inspector.html?ws=localhost:9222/devtools/page/DAB7FB6187B554E10B0BD18821265734",
-                                    "id": "DAB7FB6187B554E10B0BD18821265734",
-                                    "title": "Yahoo",
-                                    "type": "page",
-                                    "url": "https://www.yahoo.com/",
-                                    "webSocketDebuggerUrl": "ws://localhost:9222/devtools/page/DAB7FB6187B554E10B0BD18821265734"
-                                }
-                            ]
-                        */
+						// [
+						// 	{
+						// 		description: 'node.js instance',
+						// 		devtoolsFrontendUrl:
+						// 			'devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws=127.0.0.1:9229/02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
+						// 		devtoolsFrontendUrlCompat:
+						// 			'devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
+						// 		faviconUrl: 'https://nodejs.org/static/images/favicons/favicon.ico',
+						// 		id: '02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
+						// 		title: 'listen_server.mjs',
+						// 		type: 'node',
+						// 		url: 'file:///Users/bytedance/Desktop/github/mitojs-node/demos/listen_server.mjs',
+						// 		webSocketDebuggerUrl: 'ws://127.0.0.1:9229/02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
+						// 	},
+						// ]
 						const data = JSON.parse(chunk!.toString())
 						resolve(data[0])
 					} catch (e) {
@@ -207,6 +209,7 @@ export class CLI extends EventEmitter {
 		})
 	}
 
+	// 关闭 inspect 线程，端口不再监听
 	private closeInspector() {
 		return this.evaluate({
 			expression: `
