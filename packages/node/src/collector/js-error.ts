@@ -1,40 +1,30 @@
 import { BaseCollector } from './base'
 
 export class JsErrorCollector extends BaseCollector<Error> {
-	private _errInfo: Error | undefined = undefined
 	private _subscribers: Array<(err: Error) => void> = []
 
-	public get() {
-		if (this._errInfo) {
-			// 获取一次后
-			const err = this._errInfo
-			this._errInfo = undefined
-			return err
-		}
-		return undefined
-	}
-
 	private handleError(err: Error) {
-		this._errInfo = err
 		this._subscribers.forEach((cb) => cb(err))
 	}
 
-	subscribe(cb: (err: Error) => void): void {
-		this._subscribers.push(cb)
+	// TODO:这里会重复订阅
+	subscribe(cb: ((err: Error) => void) | Array<(err: Error) => void>): void {
+		const callbacks = Array.isArray(cb) ? cb : [cb]
+		this._subscribers.push(...callbacks)
 	}
 
 	protected listen() {
-		process.on('uncaughtException', this.handleError)
-		process.on('unhandledRejection', this.handleError)
+		const boundHandleError = this.handleError.bind(this)
+		process.on('uncaughtException', boundHandleError)
+		process.on('unhandledRejection', boundHandleError)
 		return () => {
-			process.off('uncaughtException', this.handleError)
-			process.off('unhandledRejection', this.handleError)
+			process.off('uncaughtException', boundHandleError)
+			process.off('unhandledRejection', boundHandleError)
 		}
 	}
 
 	destroy(): void {
 		super.destroy()
 		this._subscribers.length = 0
-		this._errInfo = undefined
 	}
 }
