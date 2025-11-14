@@ -1,6 +1,6 @@
 import type { BaseCollector } from '../collector/base'
 import { JsErrorCollector } from '../collector/js-error'
-import { SubjectNames } from '../shared'
+import { logger, SubjectNames } from '../shared'
 import { BaseMonitoringSubject } from './base'
 
 export class JSErrorSubject extends BaseMonitoringSubject<Error> {
@@ -10,5 +10,10 @@ export class JSErrorSubject extends BaseMonitoringSubject<Error> {
 
 	getSubjectName() {
 		return SubjectNames.JSError
+	}
+
+	// 重写start方法，JS-Error SUbject不需要轮询，通过事件监听实时通知
+	start() {
+		logger.error('JSErrorSubject.start() is not needed, errors are notified in real-time via event listeners')
 	}
 }
