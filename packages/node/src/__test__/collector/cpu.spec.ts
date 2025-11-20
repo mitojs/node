@@ -1,4 +1,3 @@
-// biome-ignore lint/complexity/useLiteralKeys: 测试需要访问私有属性
 import { CPUCollector } from '../../collector/cpu'
 
 describe('CPUCollector', () => {
@@ -24,6 +23,7 @@ describe('CPUCollector', () => {
 	})
 
 	describe('get', () => {
+		// 验证 get() 能根据两次采样计算出正确的 CPU 负载
 		it('should calculate CPU usage correctly', () => {
 			const cpuCollector = new CPUCollector()
 			expect(cpuCollector.get()).toEqual({
@@ -34,6 +34,7 @@ describe('CPUCollector', () => {
 	})
 
 	describe('destroy', () => {
+		// 验证 destroy() 会重置内部状态，方便下次重新采样
 		it('should reset internal state', () => {
 			const cpuCollector = new CPUCollector()
 			expect(cpuCollector['_lastHrtime']).toBe(1000000000n)

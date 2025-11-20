@@ -53,6 +53,8 @@ export class TimeoutCollector extends BaseCollector<TimeoutData> {
 	}
 
 	destroy(): void {
+		// unwrap setTimeout and setInterval
+		super.destroy()
 		this._timeoutMap.clear()
 	}
 }

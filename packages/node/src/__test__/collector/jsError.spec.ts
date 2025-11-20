@@ -12,6 +12,7 @@ describe('JSErrorCollector', () => {
 	})
 
 	describe('subscribe', () => {
+		// 验证 subscribe() 同时支持单个回调和回调数组的注册
 		it('should support subscribing with an array of callbacks or a single callback', () => {
 			const subscriber1 = jest.fn()
 			collector.subscribe(subscriber1)
@@ -27,10 +28,12 @@ describe('JSErrorCollector', () => {
 	})
 
 	describe('event listening', () => {
+		// 验证初始化时已注册事件监听器
 		it('should register event listeners on initialization', () => {
 			expect(collector['_teardown']).toHaveLength(1)
 		})
 
+		// 验证 uncaughtException 触发时，订阅者会收到对应错误
 		it('should call subscribers when uncaughtException occurs', () => {
 			const subscriber = jest.fn()
 			collector.subscribe(subscriber)
@@ -42,6 +45,7 @@ describe('JSErrorCollector', () => {
 			expect(subscriber).toHaveBeenCalledTimes(1)
 		})
 
+		// 验证存在多个订阅者时，所有订阅者都会收到错误通知
 		it('should call all subscribers when error occurs', () => {
 			const subscriber1 = jest.fn()
 			const subscriber2 = jest.fn()
@@ -56,6 +60,7 @@ describe('JSErrorCollector', () => {
 	})
 
 	describe('destroy', () => {
+		// 验证 destroy() 会清空订阅者与 teardown(清理函数)，并移除事件监听器
 		it('should clear subscribers and teardown functions(remove event listeners)', () => {
 			const subscriber = jest.fn()
 			collector.subscribe(subscriber)

@@ -7,6 +7,10 @@ export class JsErrorCollector extends BaseCollector<Error> {
 		this._subscribers.forEach((cb) => cb(err))
 	}
 
+	public get() {
+		return undefined
+	}
+
 	// TODO:这里会重复订阅
 	subscribe(cb: ((err: Error) => void) | Array<(err: Error) => void>): void {
 		const callbacks = Array.isArray(cb) ? cb : [cb]
