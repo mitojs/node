@@ -6,7 +6,7 @@ export abstract class BaseCollector<T> {
 		}
 	}
 
-	abstract get(): T | undefined
+	get?(): T | undefined
 
 	// 只有监听和劫持类的才需要订阅函数
 	subscribe?(cb: (data: T) => void): void
