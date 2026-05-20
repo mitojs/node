@@ -1,8 +1,9 @@
 {
-	"extends": "@mono/tsconfig",
+	"extends": "@mono/tsconfig/tsconfig.json",
 	"compilerOptions": {
 		"rootDir": "src",
 		"outDir": "esm",
+		"target": "ES2022",
 		"module": "Node16",
 		"moduleResolution": "node16"
 	},

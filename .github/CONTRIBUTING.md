@@ -6,6 +6,7 @@
 [`node` 下载](https://nodejs.org/download)
 [`pnpm` 下载](https://pnpm.io/)
 [`rust` 下载](https://www.rust-lang.org/tools/install)
+[`rustup` 安装](https://rustup.rs/) — Rust 工具链管理器，构建 Agent 时必需。安装命令：`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 
 # mitojs-node
 ## 安装

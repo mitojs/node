@@ -60,7 +60,7 @@ export class CLI extends EventEmitter {
 				case COMMAND_TYPE.MONITOR_CPU:
 					await this.getMonitorCPU(cmd)
 					break
-				// biome-ignore lint/suspicious/noFallthroughSwitchClause: <explanation>
+				// biome-ignore lint/suspicious/noFallthroughSwitchClause: <break instantly>
 				case COMMAND_TYPE.START_INSPECT:
 					await this.startInspect(cmd)
 					this.client.close()

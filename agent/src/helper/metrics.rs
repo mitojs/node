@@ -6,4 +6,5 @@ struct Metrics {}
 
 fn create_metrics_map() -> HashMap<u32, Metrics> {
     let metrics_map = HashMap::new();
+    metrics_map
 }

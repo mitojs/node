@@ -5,14 +5,21 @@
 	"author": "cjinhuo",
 	"license": "MIT",
 	"bin": {
-		"mito-node": "dist/index.js"
+		"mito-node": "dist/cli.mjs"
 	},
-	"main": "src/index.ts",
-	"module": "src/index.ts",
+	"main": "dist/index.cjs",
+	"module": "dist/index.esm.js",
 	"type": "module",
-	"types": "src/index.ts",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.esm.js",
+			"require": "./dist/index.cjs",
+			"types": "./dist/index.d.ts"
+		}
+	},
 	"publishConfig": {
-		"main": "dist/index.js",
+		"main": "dist/index.cjs",
 		"module": "dist/index.esm.js",
 		"types": "dist/index.d.ts"
 	},
@@ -20,16 +27,15 @@
 		"dist"
 	],
 	"scripts": {
-		"esm": "tsc -b ./tsconfig.json",
-		"watch:esm": "tsc -b ./tsconfig.json --watch",
-		"rollup": "batch-rollup -d ./rollups",
-		"build": "run-s esm rollup",
-		"build:cjs": "batch-rollup -d ./rollups -f cjs",
+		"build": "run-s vite-build:esm vite-build:cjs vite-build:bin",
+		"watch": "BUILD_TARGET=bin vite build --watch",
+		"vite-build:esm": "BUILD_TARGET=esm vite build",
+		"vite-build:cjs": "BUILD_TARGET=cjs vite build",
+		"vite-build:bin": "BUILD_TARGET=bin vite build",
 		"lint": "eslint ./src/**",
 		"test": "jest --config jest.config.cjs"
 	},
 	"dependencies": {
-		"@mono/rollup": "workspace:*",
 		"@types/ink": "2.0.3",
 		"@types/react": "19.0.8",
 		"commander": "^14.0.0",
@@ -40,6 +46,8 @@
 	},
 	"devDependencies": {
 		"@mono/tsconfig": "workspace:*",
-		"@types/ws": "^8.18.1"
+		"@types/ws": "^8.18.1",
+		"vite": "^8.0.0",
+		"vite-plugin-dts": "^4.0.0"
 	}
 }
