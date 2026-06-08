@@ -18,14 +18,14 @@
 
 使用 pnpm workspaces + Nx 任务运行器管理。
 
-| 包名 | 路径 | 描述 |
-|------|------|------|
-| `@mitojs/node` | `packages/node/` | 核心 SDK — 采集器、Rust Agent 管理、Worker Thread 代理 |
+| 包名               | 路径                 | 描述                                                      |
+| ------------------ | -------------------- | --------------------------------------------------------- |
+| `@mitojs/node`     | `packages/node/`     | 核心 SDK — 采集器、Rust Agent 管理、Worker Thread 代理    |
 | `@mitojs/node-cli` | `packages/node-cli/` | CLI 工具 — Inspector 协议、TUI（Ink/React）、Commander.js |
-| `@mono/rollup` | `utils/rollup/` | 共享 Rollup 构建工具（`batch-rollup` 命令） |
-| `@mono/tsconfig` | `utils/tsconfig/` | 共享 TypeScript 基础配置 |
-| `@mono/react-19` | `app/react-19/` | 示例 React 19 应用（Vite） |
-| Rust Agent | `agent/` | Rust 二进制程序（axum、tokio、serde） |
+| `@mono/rollup`     | `utils/rollup/`      | 共享 Rollup 构建工具（`batch-rollup` 命令）               |
+| `@mono/tsconfig`   | `utils/tsconfig/`    | 共享 TypeScript 基础配置                                  |
+| `@mono/react-19`   | `app/react-19/`      | 示例 React 19 应用（Vite）                                |
+| Rust Agent         | `agent/`             | Rust 二进制程序（axum、tokio、serde）                     |
 
 ### 核心架构模式
 
@@ -41,18 +41,18 @@
 
 **前置要求：** Node.js >= 20，pnpm >= 10，Rust 工具链（构建 Agent 时需要）
 
-| 命令 | 描述 |
-|------|------|
-| `pnpm install` | 安装依赖（`preinstall` 钩子强制使用 pnpm） |
-| `pnpm esm` | 并行构建 ESM 产物 |
-| `pnpm watch:esm` | ESM 监听模式构建 |
-| `pnpm build` | 完整构建（TypeScript + Rollup + Rust Agent） |
-| `pnpm build:rust` | 仅构建 Rust Agent（`cd agent && ./build.sh`） |
-| `pnpm test` | 并行运行所有测试 |
-| `pnpm clean` | 清理构建产物（`dist/`、`esm/`、`.tsbuildinfo`） |
-| `pnpm clean:node_module` | 清理所有 `node_modules` |
-| `pnpm web:dev` | 启动 React 19 示例应用开发服务器 |
-| `pnpm commit` | 暂存所有文件 + 交互式规范化提交（czg） |
+| 命令                     | 描述                                            |
+| ------------------------ | ----------------------------------------------- |
+| `pnpm install`           | 安装依赖（`preinstall` 钩子强制使用 pnpm）      |
+| `pnpm esm`               | 并行构建 ESM 产物                               |
+| `pnpm watch:esm`         | ESM 监听模式构建                                |
+| `pnpm build`             | 完整构建（TypeScript + Rollup + Rust Agent）    |
+| `pnpm build:rust`        | 仅构建 Rust Agent（`cd agent && ./build.sh`）   |
+| `pnpm test`              | 并行运行所有测试                                |
+| `pnpm clean`             | 清理构建产物（`dist/`、`esm/`、`.tsbuildinfo`） |
+| `pnpm clean:node_module` | 清理所有 `node_modules`                         |
+| `pnpm web:dev`           | 启动 React 19 示例应用开发服务器                |
+| `pnpm commit`            | 暂存所有文件 + 交互式规范化提交（czg）          |
 
 **包级别构建：**
 - `@mitojs/node`：`tsc -b` → `dist/`（CommonJS，ES2020）
@@ -68,16 +68,16 @@
 
 **格式化/Lint 工具：** Biome（v2.0.6）— 不使用 ESLint。
 
-| 规则 | 设置 |
-|------|------|
-| 缩进 | Tab，宽度 2 |
-| 行宽 | 120 |
-| 分号 | `asNeeded`（仅在必要时使用） |
-| 引号 | 单引号 |
-| 尾逗号 | ES5 |
-| 箭头函数括号 | 始终使用 |
-| 换行符 | LF |
-| Lint 规则 | recommended 规则集；`noExplicitAny` = info |
+| 规则         | 设置                                       |
+| ------------ | ------------------------------------------ |
+| 缩进         | Tab，宽度 2                                |
+| 行宽         | 120                                        |
+| 分号         | `asNeeded`（仅在必要时使用）               |
+| 引号         | 单引号                                     |
+| 尾逗号       | ES5                                        |
+| 箭头函数括号 | 始终使用                                   |
+| 换行符       | LF                                         |
+| Lint 规则    | recommended 规则集；`noExplicitAny` = info |
 
 **TypeScript：**
 - 严格模式（`strict: true`，`strictNullChecks: true`）
@@ -89,6 +89,27 @@
 **提交规范：** Conventional Commits，通过 commitlint + czg 执行。scope 来源于 workspace 包名 + `architecture` + `agent`。提交信息中常使用 emoji。
 
 **Git 钩子：** Husky + lint-staged（pre-commit 执行 `npx lint-staged`）。
+
+---
+
+## 注释
+
+生成代码时，以下 6 类关键位置**必须**添加注释说明：
+
+| 类别         | 说明                                | 示例                                                       |
+| ------------ | ----------------------------------- | ---------------------------------------------------------- |
+| 设计决策     | 解释为什么选择当前方案而非其他方案  | `// 使用 Worker Thread 而非 child_process，避免序列化开销` |
+| 平台兼容性   | 标注平台差异或条件分支的原因        | `// Windows 不支持 SIGUSR1，改用 named pipe 激活调试器`    |
+| 性能关键路径 | 说明对性能有显著影响的实现细节      | `// 批量合并 IPC 消息，减少系统调用次数`                   |
+| 协议约束     | 记录外部协议/规范的限制条件         | `// CDP 协议要求 id 单调递增，不可复用`                    |
+| Workaround   | 说明临时方案的背景与移除条件        | `// Node.js < 20.6 不支持 --env-file，手动解析 .env`       |
+| 接口契约     | 描述公开 API 的入参、返回值与副作用 | `// 返回的 Observable 在 unsubscribe 后自动停止采集`       |
+
+**原则：**
+- 注释解释 **Why**（为什么这样做），而非 **What**（做了什么）——代码本身应能表达 What。
+- 如果删除注释后，未来的读者会对代码意图产生疑惑，则该注释是必要的。
+- 禁止写无意义的重复注释（如 `// 设置端口` 对应 `setPort(8080)`）。
+- 单行注释优先；仅在需要多条信息时使用多行注释块。
 
 ---
 

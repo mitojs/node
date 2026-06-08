@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { program } from 'commander'
-import { CLI } from './cli.js'
-import { COMMAND_CONFIGS } from './constants.js'
+import { registry } from './core/registry.js'
 import { logger } from './logger.js'
-import type { AllCommandOptions } from './types/commands.js'
+import { registerBuiltinPlugins } from './plugins/index.js'
+import { InspectorSession } from './services/inspector-session.js'
+import { createOutputFormatter } from './services/output-formatter.js'
 
 interface CmdOptions {
 	pid: string
@@ -11,64 +12,73 @@ interface CmdOptions {
 	json?: boolean
 }
 
-let inputCmd!: AllCommandOptions
+registerBuiltinPlugins()
 
 program
 	.requiredOption('-p, --pid <pid>', 'process id of the target process')
 	.option('--port <port>', 'inspector port of the target process', '9229')
 	.option('--json', 'output in JSON format for programmatic consumption', false)
 
-// 遍历命令配置数组来创建命令
-COMMAND_CONFIGS.forEach((config) => {
-	const command = program.command(config.command).description(config.description)
-	// 添加命令选项
-	if (config.options) {
-		config.options.forEach((option) => {
-			if (option.defaultValue) {
-				command.option(option.flags, option.description, option.defaultValue)
+for (const plugin of registry.getAll()) {
+	const command = program.command(plugin.name).description(plugin.description)
+	if (plugin.options) {
+		for (const opt of plugin.options) {
+			if (opt.defaultValue) {
+				command.option(opt.flags, opt.description, opt.defaultValue)
 			} else {
-				command.option(option.flags, option.description)
+				command.option(opt.flags, opt.description)
 			}
-		})
-	}
-
-	// 添加命令动作
-	command.action((options) => {
-		inputCmd = {
-			commandType: config.command,
-			options,
 		}
+	}
+	command.action(async (cmdOptions) => {
+		const globalOpts = program.opts<CmdOptions>()
+		logger.debug('process.argv', process.argv)
+		logger.debug('options', globalOpts, plugin.name, cmdOptions)
+
+		const pid = Number(globalOpts.pid)
+		if (Number.isNaN(pid)) {
+			console.error('Error: --pid must be a valid number')
+			process.exit(1)
+		}
+		try {
+			process.kill(pid, 0)
+		} catch {
+			console.error(`Error: process ${pid} does not exist`)
+			process.exit(1)
+		}
+
+		const port = Number(globalOpts.port)
+		const resolvedPort = Number.isNaN(port) ? 9229 : port
+		const json = globalOpts.json ?? false
+		const output = createOutputFormatter(json)
+
+		const session = new InspectorSession()
+		try {
+			await session.open(pid, resolvedPort)
+			await session.connect(resolvedPort)
+		} catch (e: any) {
+			output({ success: false, command: plugin.name, error: e.message })
+			process.exit(1)
+		}
+
+		try {
+			const result = await plugin.execute({ pid, port: resolvedPort, json, session, output }, cmdOptions)
+			if (result.success) {
+				output({ success: true, command: plugin.name, data: result.data })
+			} else {
+				output({ success: false, command: plugin.name, error: result.error })
+			}
+		} catch (e) {
+			output({ success: false, command: plugin.name, error: (e as Error).message })
+		}
+
+		// start-inspect 需要保持 Inspector 开启供 DevTools 连接，不执行 cleanup
+		if (plugin.name !== 'start-inspect') {
+			session.closeInspector().catch(() => {})
+		}
+		session.close()
+		process.exit(0)
 	})
-})
+}
 
 program.parse(process.argv)
-
-const options = program.opts<CmdOptions>()
-
-logger.debug('process.argv', process.argv)
-logger.debug('options', options, inputCmd)
-
-const pid = Number(options.pid)
-if (Number.isNaN(pid)) {
-	console.error('Error: --pid must be a valid number')
-	process.exit(1)
-}
-try {
-	process.kill(pid, 0)
-} catch {
-	console.error(`Error: process ${pid} does not exist`)
-	process.exit(1)
-}
-
-const port = Number(options.port)
-const resolvedPort = Number.isNaN(port) ? 9229 : port
-
-// 无需判断 inputCmd 是否存在，program.parse 会自动处理
-const cli = new CLI({
-	pid,
-	port: resolvedPort,
-	cmd: inputCmd,
-	json: options.json,
-})
-
-cli.run()

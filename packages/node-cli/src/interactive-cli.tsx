@@ -1,14 +1,22 @@
 #!/usr/bin/env node
 import { Box, type Key, render, Text, useApp, useInput } from 'ink'
 import { useEffect, useState } from 'react'
-import { CLI } from './cli.js'
-import { COMMAND_CONFIGS, COMMAND_TYPE } from './constants.js'
+import type { DiagnosticPlugin } from './core/plugin.js'
+import { registry } from './core/registry.js'
+import { registerBuiltinPlugins } from './plugins/index.js'
+import { InspectorSession } from './services/inspector-session.js'
+import { createOutputFormatter } from './services/output-formatter.js'
 import { getNodeProcesses, type NodeProcess } from './shared/command.js'
-import { Steps } from './types/cli.js'
-import type { AllCommandOptions, CommandOptionsMap } from './types/commands.js'
 
-// 常量定义
 const DEFAULT_PORT = 9229
+
+registerBuiltinPlugins()
+
+enum Steps {
+	SelectPid = 'SelectPid',
+	SelectCommand = 'SelectCommand',
+	Running = 'Running',
+}
 
 interface AppState {
 	step: Steps
@@ -16,13 +24,15 @@ interface AppState {
 	selectedPidIndex: number
 	selectedPid: number | null
 	selectedCommandIndex: number
-	selectedCommand: COMMAND_TYPE | null
+	selectedCommand: string | null
 	error: string | null
 	executionStatus: 'idle' | 'running' | 'success' | 'error'
 }
 
 function InteractiveCLI() {
 	const { exit } = useApp()
+	const plugins = registry.getAll()
+
 	const [state, setState] = useState<AppState>({
 		step: Steps.SelectPid,
 		processes: [],
@@ -34,7 +44,6 @@ function InteractiveCLI() {
 		executionStatus: 'idle',
 	})
 
-	// 获取Node进程列表
 	const fetchProcesses = () => {
 		try {
 			const processes = getNodeProcesses()
@@ -44,7 +53,6 @@ function InteractiveCLI() {
 				setState((prev) => ({
 					...prev,
 					processes,
-					// 重置选中索引，避免数组越界
 					selectedPidIndex: Math.min(prev.selectedPidIndex, processes.length - 1),
 				}))
 			}
@@ -56,24 +64,19 @@ function InteractiveCLI() {
 		}
 	}
 
-	// 初始化时获取进程列表
-	// biome-ignore lint/correctness/useExhaustiveDependencies: 不需要依赖
+	// biome-ignore lint/correctness/useExhaustiveDependencies: 初始化
 	useEffect(() => {
 		fetchProcesses()
 	}, [])
 
-	// 处理键盘输入
 	useInput((input, key) => {
-		// 退出操作
 		if (key.escape || (key.ctrl && input === 'c')) {
 			exit()
 			return
 		}
 
-		// 命令执行完成后的处理
 		if (state.executionStatus === 'success' || state.executionStatus === 'error') {
 			if (key.return) {
-				// 返回命令选择界面
 				setState((prev) => ({
 					...prev,
 					step: Steps.SelectCommand,
@@ -81,7 +84,6 @@ function InteractiveCLI() {
 					error: null,
 				}))
 			} else if (key.backspace) {
-				// 返回进程选择界面
 				setState((prev) => ({
 					...prev,
 					step: Steps.SelectPid,
@@ -93,17 +95,13 @@ function InteractiveCLI() {
 			return
 		}
 
-		// 进程选择阶段
 		if (state.step === Steps.SelectPid) {
 			handlePidSelectionInput(key, input)
-		}
-		// 命令选择阶段
-		else if (state.step === Steps.SelectCommand) {
+		} else if (state.step === Steps.SelectCommand) {
 			handleCommandSelectionInput(key, input)
 		}
 	})
 
-	// 处理进程选择输入
 	const handlePidSelectionInput = (key: Key, input: string) => {
 		if (key.upArrow) {
 			setState((prev) => ({
@@ -127,42 +125,35 @@ function InteractiveCLI() {
 					error: null,
 				}))
 			}
-		}
-		// 刷新进程列表
-		else if (input === 'r' || input === 'R') {
+		} else if (input === 'r' || input === 'R') {
 			fetchProcesses()
 		}
 	}
 
-	// 处理命令选择输入
-	const handleCommandSelectionInput = (key: Key, input: string) => {
+	const handleCommandSelectionInput = (key: Key, _input: string) => {
 		if (key.upArrow) {
 			setState((prev) => ({
 				...prev,
-				selectedCommandIndex:
-					prev.selectedCommandIndex === 0 ? COMMAND_CONFIGS.length - 1 : prev.selectedCommandIndex - 1,
+				selectedCommandIndex: prev.selectedCommandIndex === 0 ? plugins.length - 1 : prev.selectedCommandIndex - 1,
 				error: null,
 			}))
 		} else if (key.downArrow) {
 			setState((prev) => ({
 				...prev,
-				selectedCommandIndex:
-					prev.selectedCommandIndex === COMMAND_CONFIGS.length - 1 ? 0 : prev.selectedCommandIndex + 1,
+				selectedCommandIndex: prev.selectedCommandIndex === plugins.length - 1 ? 0 : prev.selectedCommandIndex + 1,
 				error: null,
 			}))
 		} else if (key.return) {
-			const selectedConfig = COMMAND_CONFIGS[state.selectedCommandIndex]
-			if (selectedConfig) {
+			const selectedPlugin = plugins[state.selectedCommandIndex]
+			if (selectedPlugin) {
 				setState((prev) => ({
 					...prev,
-					selectedCommand: selectedConfig.command,
+					selectedCommand: selectedPlugin.name,
 					step: Steps.Running,
 					executionStatus: 'running',
 					error: null,
 				}))
-
-				// 执行选中的命令
-				executeCommand(state.selectedPid!, selectedConfig.command)
+				executeCommand(state.selectedPid!, selectedPlugin)
 			}
 		} else if (key.backspace) {
 			setState((prev) => ({
@@ -174,82 +165,32 @@ function InteractiveCLI() {
 		}
 	}
 
-	// 创建命令选项
-	const createCommandOptions = <T extends COMMAND_TYPE>(commandType: T): CommandOptionsMap[T] => {
-		const commandConfig = COMMAND_CONFIGS.find((config) => config.command === commandType)
-
-		// 默认选项对象
-		const defaultOptions: Partial<CommandOptionsMap[T]> = {}
-
-		// 如果有配置的默认选项，应用它们
-		if (commandConfig?.options) {
-			commandConfig.options.forEach((option) => {
-				if (option.defaultValue) {
-					// 从flags中提取选项名（例如从'-d, --duration <duration>'中提取'duration'）
-					const optionName = option.flags
-						.split(',')
-						.find((flag) => flag.includes('--'))
-						?.split('--')[1]
-						.split('<')[0]
-						.trim()
-
-					if (optionName) {
-						// 尝试转换为数字
-						defaultOptions[optionName] = !isNaN(Number(option.defaultValue))
-							? Number(option.defaultValue)
-							: option.defaultValue
-					}
-				}
-			})
-		}
-
-		// 特殊处理
-		switch (commandType) {
-			case COMMAND_TYPE.CPU_PROFILE:
-				return { duration: 10000 } as CommandOptionsMap[T]
-			case COMMAND_TYPE.RUN_CODE:
-				return { code: 'console.log("Hello from injected code!")' } as CommandOptionsMap[T]
-			default:
-				return defaultOptions as CommandOptionsMap[T]
-		}
-	}
-
-	// 执行命令
-	const executeCommand = async (pid: number, commandType: COMMAND_TYPE) => {
+	const executeCommand = async (pid: number, plugin: DiagnosticPlugin) => {
+		const session = new InspectorSession()
+		const output = createOutputFormatter(false)
 		try {
-			// 使用重构后的函数创建命令选项
-			const options = createCommandOptions(commandType)
+			await session.open(pid, DEFAULT_PORT)
+			await session.connect(DEFAULT_PORT)
 
-			const commandOptions = {
-				commandType,
-				options,
-			} as AllCommandOptions
+			const result = await plugin.execute({ pid, port: DEFAULT_PORT, json: false, session, output }, {})
 
-			const cli = new CLI({
-				pid,
-				port: DEFAULT_PORT,
-				cmd: commandOptions,
-			})
-
-			await cli.run()
-
-			// 命令执行成功
-			setState((prev) => ({
-				...prev,
-				executionStatus: 'success',
-				error: null,
-			}))
+			if (result.success) {
+				setState((prev) => ({ ...prev, executionStatus: 'success', error: null }))
+			} else {
+				setState((prev) => ({ ...prev, error: result.error || 'Unknown error', executionStatus: 'error' }))
+			}
 		} catch (error) {
-			// 命令执行失败
 			setState((prev) => ({
 				...prev,
 				error: `执行命令失败: ${(error as Error).message}`,
 				executionStatus: 'error',
 			}))
+		} finally {
+			session.closeInspector().catch(() => {})
+			session.close()
 		}
 	}
 
-	// 错误界面
 	if (state.error && state.executionStatus !== 'error') {
 		return (
 			<Box flexDirection='column'>
@@ -259,7 +200,6 @@ function InteractiveCLI() {
 		)
 	}
 
-	// 进程选择界面
 	if (state.step === Steps.SelectPid) {
 		return (
 			<Box flexDirection='column'>
@@ -268,8 +208,6 @@ function InteractiveCLI() {
 				</Text>
 				<Text color='gray'>使用 ↑↓ 键选择，回车确认，R 键刷新，ESC 退出</Text>
 				<Text> </Text>
-
-				{/* 表头 */}
 				<Text color='blue' bold>
 					{'  '}
 					{'PID'.padEnd(8)}
@@ -286,17 +224,15 @@ function InteractiveCLI() {
 					{'─'.repeat(12)}
 					{'─'.repeat(50)}
 				</Text>
-
-				{/* 进程列表 */}
-				{state.processes.map((process, index) => (
-					<Box key={process.pid}>
+				{state.processes.map((proc, index) => (
+					<Box key={proc.pid}>
 						<Text color={index === state.selectedPidIndex ? 'green' : 'white'}>
 							{index === state.selectedPidIndex ? '► ' : '  '}
-							{process.pid.toString().padEnd(8)}
-							{process.ppid.toString().padEnd(8)}
-							{process.stime.padEnd(10)}
-							{process.time.padEnd(12)}
-							{process.command}
+							{proc.pid.toString().padEnd(8)}
+							{proc.ppid.toString().padEnd(8)}
+							{proc.stime.padEnd(10)}
+							{proc.time.padEnd(12)}
+							{proc.command}
 						</Text>
 					</Box>
 				))}
@@ -304,7 +240,6 @@ function InteractiveCLI() {
 		)
 	}
 
-	// 命令选择界面
 	if (state.step === Steps.SelectCommand) {
 		return (
 			<Box flexDirection='column'>
@@ -316,11 +251,11 @@ function InteractiveCLI() {
 				</Text>
 				<Text color='gray'>使用 ↑↓ 键选择，回车确认，Backspace 返回，ESC 退出</Text>
 				<Text> </Text>
-				{COMMAND_CONFIGS.map((config, index) => (
-					<Box key={config.command} flexDirection='column'>
+				{plugins.map((plugin, index) => (
+					<Box key={plugin.name} flexDirection='column'>
 						<Text color={index === state.selectedCommandIndex ? 'green' : 'white'}>
 							{index === state.selectedCommandIndex ? '► ' : '  '}
-							{config.command} - {config.description}
+							{plugin.name} - {plugin.description}
 						</Text>
 					</Box>
 				))}
@@ -328,9 +263,7 @@ function InteractiveCLI() {
 		)
 	}
 
-	// 命令执行界面
 	if (state.step === Steps.Running) {
-		// 运行中状态
 		if (state.executionStatus === 'running') {
 			return (
 				<Box flexDirection='column'>
@@ -342,7 +275,6 @@ function InteractiveCLI() {
 			)
 		}
 
-		// 成功状态
 		if (state.executionStatus === 'success') {
 			return (
 				<Box flexDirection='column'>
@@ -356,7 +288,6 @@ function InteractiveCLI() {
 			)
 		}
 
-		// 错误状态
 		if (state.executionStatus === 'error' && state.error) {
 			return (
 				<Box flexDirection='column'>
@@ -374,9 +305,6 @@ function InteractiveCLI() {
 	return null
 }
 
-// 如果直接运行此文件，则启动交互式 CLI
 if (import.meta.url === `file://${process.argv[1]}`) {
 	render(<InteractiveCLI />)
 }
-
-export default InteractiveCLI
