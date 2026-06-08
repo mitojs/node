@@ -72,8 +72,3 @@ export class MitoNode {
 		// 关闭 subject ，并通过 uds 传输给 rust agent
 	}
 }
-
-const mitoNode = new MitoNode()
-mitoNode.start()
-
-setTimeout(() => {}, 1000000)

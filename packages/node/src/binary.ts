@@ -18,7 +18,7 @@ interface PlatformInfo {
 /**
  * 获取当前平台信息
  */
-function getPlatformInfo(): PlatformInfo {
+export function getPlatformInfo(): PlatformInfo {
 	const currentPlatform = platform()
 	const currentArch = arch()
 
@@ -26,7 +26,8 @@ function getPlatformInfo(): PlatformInfo {
 
 	switch (currentPlatform) {
 		case 'win32':
-			binaryName = 'mitojs-agent-win32-x64.exe'
+			// 二进制文件名使用 win 而非 win32，与 binaries/ 目录中实际文件名一致
+			binaryName = 'mitojs-agent-win-x64.exe'
 			break
 		case 'darwin':
 			binaryName = currentArch === 'arm64' ? 'mitojs-agent-darwin-arm64' : 'mitojs-agent-darwin-x64'
@@ -161,10 +162,24 @@ export class MitojsAgent {
 	getPid(): number | undefined {
 		return this.process?.pid
 	}
+
+	/**
+	 * 判断 Agent 进程是否在运行中
+	 */
+	isRunning(): boolean {
+		return this.process !== null
+	}
 }
 
 /**
- * 创建 Agent 实例
+ * 创建 Agent 实例（不启动）
+ */
+export function createAgent(): MitojsAgent {
+	return new MitojsAgent()
+}
+
+/**
+ * 创建并启动 Agent 实例
  */
 export async function initAgent(): Promise<MitojsAgent> {
 	const agent = new MitojsAgent()

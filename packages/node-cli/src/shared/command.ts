@@ -7,7 +7,12 @@ export interface NodeProcess {
 	time: string
 	command: string
 }
+
+// 依赖 pgrep + ps 命令，仅支持 macOS / Linux。Windows 需要改用 tasklist 实现。
 export function getNodeProcesses(): NodeProcess[] {
+	if (process.platform === 'win32') {
+		return []
+	}
 	try {
 		// 使用 pgrep 获取 Node.js 进程 PID，然后用 ps 获取详细信息
 		const pids = execSync('pgrep node', { encoding: 'utf8' }).trim()

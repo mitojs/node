@@ -25,7 +25,7 @@ describe('Binary Management', () => {
 
 			switch (currentPlatform) {
 				case 'win32':
-					expect(platformInfo.binaryName).toBe('mitojs-agent-win32-x64.exe')
+					expect(platformInfo.binaryName).toBe('mitojs-agent-win-x64.exe')
 					break
 				case 'darwin':
 					if (currentArch === 'arm64') {
@@ -36,9 +36,9 @@ describe('Binary Management', () => {
 					break
 				case 'linux':
 					if (currentArch === 'arm64') {
-						expect(platformInfo.binaryName).toBe('mitojs-agent-linux-arm64')
+						expect(platformInfo.binaryName).toBe('mitojs-agent-linux-arm64-musl')
 					} else {
-						expect(platformInfo.binaryName).toBe('mitojs-agent-linux-x64')
+						expect(platformInfo.binaryName).toBe('mitojs-agent-linux-x64-musl')
 					}
 					break
 			}

@@ -1,3 +1,5 @@
 export type { BaseCollector } from './base'
 export { CPUCollector, type CPUData } from './cpu'
+export { JsErrorCollector } from './js-error'
 export { MemoryCollector, type MemoryData } from './memory'
+export { TimeoutCollector, type TimeoutData } from './timeout'

@@ -1,0 +1,7 @@
+export const DEFAULT_INSPECTOR_PORT = 9229
+
+export const CPU_POLL_INTERVAL_MS = 1000
+
+export const INSPECTOR_CONNECT_RETRIES = 10
+
+export const INSPECTOR_RETRY_DELAY_MS = 500

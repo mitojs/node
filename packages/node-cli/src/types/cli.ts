@@ -13,6 +13,7 @@ export interface CLIRuntimeOptions {
 	pid: number
 	port: number
 	cmd: AllCommandOptions
+	json?: boolean
 }
 
 // 用户可操作的状态枚举

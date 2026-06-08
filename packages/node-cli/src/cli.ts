@@ -6,10 +6,28 @@ import { render } from 'ink'
 import React from 'react'
 import WebSocket from 'ws'
 import CPUGraph from './CPUGraph.js'
-import { CHROME_DEV_TASK_TYPE, COMMAND_TYPE } from './constants.js'
-import { FUNCTION_WRAPPER, genFilename, getDevToolsUrl, upload } from './helper.js'
+import { INSPECTOR_CONNECT_RETRIES, INSPECTOR_RETRY_DELAY_MS } from './config.js'
+import { COMMAND_TYPE } from './constants.js'
+import { FUNCTION_WRAPPER, genFilename } from './helper.js'
+import { logger } from './logger.js'
 import type { CLIRuntimeOptions, CommandOptions } from './types/index.js'
 
+// DO NOT DELETE - Inspector /json endpoint response example:
+// [
+// 	{
+// 		description: 'node.js instance',
+// 		devtoolsFrontendUrl:
+// 			'devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws=127.0.0.1:9229/02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
+// 		devtoolsFrontendUrlCompat:
+// 			'devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
+// 		faviconUrl: 'https://nodejs.org/static/images/favicons/favicon.ico',
+// 		id: '02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
+// 		title: 'listen_server.mjs',
+// 		type: 'node',
+// 		url: 'file:///Users/bytedance/Desktop/github/mitojs-node/demos/listen_server.mjs',
+// 		webSocketDebuggerUrl: 'ws://127.0.0.1:9229/02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
+// 	},
+// ]
 interface InspectorInfo {
 	description: string
 	devtoolsFrontendUrl: string
@@ -20,12 +38,19 @@ interface InspectorInfo {
 	webSocketDebuggerUrl: string
 }
 
+interface RequestContext {
+	resolve: (value: any) => void
+	reject: (reason: Error) => void
+}
+
 export class CLI extends EventEmitter {
 	private options: CLIRuntimeOptions
 	private client!: WebSocket
 	private requestId = 1
-	private requestContext = {}
+	private requestContext: Record<number, RequestContext> = {}
 	private inspectorInfo!: InspectorInfo
+	private _lastCpuData: { user: number; system: number; hrtime: bigint } | null = null
+
 	constructor(options: CLIRuntimeOptions) {
 		super()
 		this.options = options
@@ -37,10 +62,10 @@ export class CLI extends EventEmitter {
 			this.inspectorInfo = await this.getInspectorInfo()
 			this.client = await this.connectToInspector()
 			this.listenInspectorMessage()
-			// console.log('connect to inspector successfully\n')
+			logger.debug('connect to inspector successfully')
 		} catch (e: any) {
-			console.error(e.message)
-			process.exit(0)
+			this.output({ success: false, command: this.options.cmd.commandType, error: e.message })
+			process.exit(1)
 		}
 		const { cmd } = this.options
 		try {
@@ -60,22 +85,27 @@ export class CLI extends EventEmitter {
 				case COMMAND_TYPE.MONITOR_CPU:
 					await this.getMonitorCPU(cmd)
 					break
-				// biome-ignore lint/suspicious/noFallthroughSwitchClause: <break instantly>
+				// biome-ignore lint/suspicious/noFallthroughSwitchClause: process.exit() guarantees no fallthrough
 				case COMMAND_TYPE.START_INSPECT:
 					await this.startInspect(cmd)
 					this.client.close()
 					process.exit(0)
 				case COMMAND_TYPE.STOP_INSPECT:
+					// 先输出成功信息，再关闭 Inspector。
+					// closeInspector 会导致 WebSocket 断连，evaluate 无法收到响应。
+					this.output({
+						success: true,
+						command: 'stop-inspect',
+						data: `Inspector of process ${this.options.pid} has been closed`,
+					})
+					this.closeInspector().catch(() => {})
 					break
 				case COMMAND_TYPE.RUN_CODE:
 					await this.runCode(cmd)
 					break
-				default:
-					console.error(`invalid cmd: ${cmd}`)
-					console.log(`execute ${cmd} successfully\n`)
 			}
 		} catch (e) {
-			console.error(`failed to execute cmd: ${cmd}: ${(e as Error).message}`)
+			this.output({ success: false, command: cmd.commandType, error: (e as Error).message })
 		}
 
 		this.closeInspector()
@@ -83,6 +113,22 @@ export class CLI extends EventEmitter {
 		process.exit(0)
 	}
 
+	private output(data: { success: boolean; command: string; data?: any; error?: string }) {
+		if (this.options.json) {
+			process.stdout.write(JSON.stringify(data) + '\n')
+		} else if (data.success && data.data !== undefined) {
+			if (typeof data.data === 'string') {
+				console.log(data.data)
+			} else {
+				console.log(JSON.stringify(data.data, null, 4))
+			}
+		} else if (!data.success && data.error) {
+			console.error(`Error: ${data.error}`)
+		}
+	}
+
+	// SIGUSR1 触发目标进程激活 V8 Inspector，随后轮询探测端口是否就绪。
+	// 同时探测 127.0.0.1 和 ::1，因为不同 Node 版本/OS 默认绑定地址不同。
 	private async openInspector() {
 		const { pid, port } = this.options
 		try {
@@ -90,7 +136,7 @@ export class CLI extends EventEmitter {
 		} catch (e) {
 			throw new Error(`failed to start inspector: ${(e as Error).message}`)
 		}
-		const detect = (host: string) => {
+		const detect = (host: string): Promise<boolean> => {
 			return new Promise((resolve) => {
 				const socket = net.connect(port, host)
 				socket.on('connect', () => {
@@ -102,7 +148,7 @@ export class CLI extends EventEmitter {
 				})
 			})
 		}
-		let i = 10
+		let i = INSPECTOR_CONNECT_RETRIES
 		while (i--) {
 			if (await detect('127.0.0.1')) {
 				return
@@ -110,7 +156,7 @@ export class CLI extends EventEmitter {
 			if (await detect('::1')) {
 				return
 			}
-			await new Promise((resolve) => setTimeout(resolve, 500))
+			await new Promise((resolve) => setTimeout(resolve, INSPECTOR_RETRY_DELAY_MS))
 		}
 		throw new Error('failed to start inspector: timeout')
 	}
@@ -118,7 +164,7 @@ export class CLI extends EventEmitter {
 	private getInspectorInfo(): Promise<InspectorInfo> {
 		return new Promise((resolve, reject) => {
 			const { port } = this.options
-			const errorHandler = (e) => {
+			const errorHandler = (e: Error) => {
 				reject(new Error(`failed to get inspector info: ${e.message}`))
 			}
 			const client = http.get(`http://127.0.0.1:${port}/json`, (res) => {
@@ -128,25 +174,10 @@ export class CLI extends EventEmitter {
 				})
 				res.on('end', () => {
 					try {
-						// [
-						// 	{
-						// 		description: 'node.js instance',
-						// 		devtoolsFrontendUrl:
-						// 			'devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws=127.0.0.1:9229/02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
-						// 		devtoolsFrontendUrlCompat:
-						// 			'devtools://devtools/bundled/inspector.html?experiments=true&v8only=true&ws=127.0.0.1:9229/02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
-						// 		faviconUrl: 'https://nodejs.org/static/images/favicons/favicon.ico',
-						// 		id: '02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
-						// 		title: 'listen_server.mjs',
-						// 		type: 'node',
-						// 		url: 'file:///Users/bytedance/Desktop/github/mitojs-node/demos/listen_server.mjs',
-						// 		webSocketDebuggerUrl: 'ws://127.0.0.1:9229/02bad627-0e7f-4a7f-ae1c-99957ac4fc25',
-						// 	},
-						// ]
-						const data = JSON.parse(chunk!.toString())
+						const data: InspectorInfo[] = JSON.parse(chunk!.toString())
 						resolve(data[0])
 					} catch (e) {
-						errorHandler(e)
+						errorHandler(e as Error)
 					}
 				})
 				res.on('error', errorHandler)
@@ -157,7 +188,7 @@ export class CLI extends EventEmitter {
 
 	private connectToInspector(): Promise<WebSocket> {
 		return new Promise((resolve, reject) => {
-			const errorHandler = (e) => {
+			const errorHandler = (e: Error) => {
 				reject(new Error(`failed to connect to inspector: ${e.message}`))
 			}
 			try {
@@ -167,7 +198,7 @@ export class CLI extends EventEmitter {
 				})
 				ws.on('error', errorHandler)
 			} catch (e) {
-				errorHandler(e)
+				errorHandler(e as Error)
 			}
 		})
 	}
@@ -190,26 +221,28 @@ export class CLI extends EventEmitter {
 					this.emit(method, params)
 				}
 			} catch (e) {
-				console.error(e)
+				logger.error('failed to parse inspector message', e)
 			}
 		})
 	}
 
-	private sendMessageToInspector(data: { [key: string]: any }): any {
-		data = {
+	private sendMessageToInspector(data: {
+		method: string
+		params?: Record<string, any>
+		[key: string]: any
+	}): Promise<any> {
+		const msg = {
 			...data,
 			id: this.requestId++,
 		}
 		return new Promise((resolve, reject) => {
-			this.requestContext[data.id] = {
-				resolve,
-				reject,
-			}
-			this.client.send(JSON.stringify(data))
+			this.requestContext[msg.id] = { resolve, reject }
+			this.client.send(JSON.stringify(msg))
 		})
 	}
 
-	// 关闭 inspect 线程，端口不再监听
+	// 关闭目标进程的 Inspector 线程，端口停止监听。
+	// 注意：这不会终止目标进程，仅关闭调试接口。
 	private closeInspector() {
 		return this.evaluate({
 			expression: `
@@ -227,7 +260,7 @@ export class CLI extends EventEmitter {
 
 	private async getCPUProfile(cmd: CommandOptions<COMMAND_TYPE.CPU_PROFILE>) {
 		const { duration } = cmd.options
-		return new Promise((resolve, reject) => {
+		return new Promise<void>((resolve, reject) => {
 			this.sendMessageToInspector({ method: 'Profiler.enable' })
 			this.sendMessageToInspector({ method: 'Profiler.start' })
 			setTimeout(async () => {
@@ -235,8 +268,12 @@ export class CLI extends EventEmitter {
 					const data = await this.sendMessageToInspector({ method: 'Profiler.stop' })
 					const filename = genFilename('cpuprofile')
 					fs.writeFileSync(filename, JSON.stringify(data.profile))
-					await upload(filename)
-					resolve(null)
+					this.output({
+						success: true,
+						command: 'cpuprofile',
+						data: { filename },
+					})
+					resolve()
 				} catch (e) {
 					reject(e)
 				}
@@ -259,8 +296,11 @@ export class CLI extends EventEmitter {
                 `
 			),
 		})
-		const { dest } = await upload(filename)
-		console.log(`Online Analysis Url: ${getDevToolsUrl({ filename: CHROME_DEV_TASK_TYPE.HEAP_SNAPSHOT, dest })}\n`)
+		this.output({
+			success: true,
+			command: 'heapsnapshot',
+			data: { filename },
+		})
 	}
 
 	private async getProcessReport(cmd: CommandOptions<COMMAND_TYPE.REPORT>) {
@@ -276,19 +316,14 @@ export class CLI extends EventEmitter {
                 `
 			),
 		})
-		const { url } = await upload(filename)
-		console.log(`Online Report Data Url: ${url}\n`)
+		this.output({ success: true, command: 'report', data: { filename } })
 	}
 
 	private async getMemoryInfo(cmd: CommandOptions<COMMAND_TYPE.MEMORY>) {
 		const data = await this.evaluate({
-			expression: FUNCTION_WRAPPER(
-				`
-                    return process.memoryUsage();
-                `
-			),
+			expression: FUNCTION_WRAPPER(`return process.memoryUsage();`),
 		})
-		console.log(`process memory info: ${JSON.stringify(data, null, 4)}`)
+		this.output({ success: true, command: 'memory', data })
 	}
 
 	private async startInspect(cmd: CommandOptions<COMMAND_TYPE.START_INSPECT>) {
@@ -301,14 +336,11 @@ export class CLI extends EventEmitter {
 			),
 		})
 		const { host, pathname } = new URL(url)
-		console.log('debugging Node.js by enter this url in your browser:\n')
-		console.log(`devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws=${host}${pathname}\n`)
+		const devtoolsUrl = `devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws=${host}${pathname}`
+		this.output({ success: true, command: 'start-inspect', data: { devtoolsUrl } })
 	}
 
 	private async runCode(cmd: CommandOptions<COMMAND_TYPE.RUN_CODE>) {
-		// cmd : file | code
-		// todo 支持文件
-		// todo 支持代码
 		let code = cmd.options.code || cmd.options.file
 		if (cmd.options.file && /\.js$/.test(cmd.options.file)) {
 			code = fs.readFileSync(cmd.options.file, 'utf8')
@@ -321,10 +353,10 @@ export class CLI extends EventEmitter {
 		const result = await this.evaluate({
 			expression: FUNCTION_WRAPPER(code),
 		})
-		console.log(result)
+		this.output({ success: true, command: 'run-code', data: result })
 	}
 
-	private async evaluate(options): Promise<any> {
+	private async evaluate(options: { expression: string; [key: string]: any }): Promise<any> {
 		const result = await this.sendMessageToInspector({
 			method: 'Runtime.evaluate',
 			params: {
@@ -345,10 +377,49 @@ export class CLI extends EventEmitter {
 		}
 	}
 
+	private computeCPUPercent(data: { user: number; system: number; hrtime: string }): number {
+		const current = { user: data.user, system: data.system, hrtime: BigInt(data.hrtime) }
+		if (!this._lastCpuData) {
+			this._lastCpuData = current
+			return 0
+		}
+		const timeDiff = Number(current.hrtime - this._lastCpuData.hrtime) / 1e3
+		const userDiff = current.user - this._lastCpuData.user
+		const systemDiff = current.system - this._lastCpuData.system
+		this._lastCpuData = current
+		if (timeDiff <= 0) return 0
+		return Math.min(((userDiff + systemDiff) / timeDiff) * 100, 100)
+	}
+
 	private async getMonitorCPU(cmd: CommandOptions<COMMAND_TYPE.MONITOR_CPU>) {
-		const pid = this.options.pid
-		render(React.createElement(CPUGraph, { pid }))
-		// 阻塞主进程直到用户Ctrl+C
-		await new Promise(() => {})
+		const getCPUData = async (): Promise<number> => {
+			const data = await this.evaluate({
+				expression: FUNCTION_WRAPPER(`
+					const usage = process.cpuUsage();
+					const hrtime = process.hrtime.bigint();
+					return { user: usage.user, system: usage.system, hrtime: hrtime.toString() };
+				`),
+			})
+			return this.computeCPUPercent(data)
+		}
+
+		if (this.options.json) {
+			// NDJSON 模式：每秒输出一行 JSON
+			while (true) {
+				try {
+					const cpuPercent = await getCPUData()
+					process.stdout.write(
+						JSON.stringify({ success: true, command: 'monitor-cpu', data: { cpuPercent, timestamp: Date.now() } }) +
+							'\n'
+					)
+				} catch {
+					break
+				}
+				await new Promise((resolve) => setTimeout(resolve, 1000))
+			}
+		} else {
+			render(React.createElement(CPUGraph, { getCPUData }))
+			await new Promise(() => {})
+		}
 	}
 }
