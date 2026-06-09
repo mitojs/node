@@ -115,6 +115,8 @@
 
 ## 测试
 
+### TypeScript 测试
+
 **框架：** Jest + ts-jest
 
 **配置：**
@@ -130,6 +132,37 @@
 pnpm test                            # 并行运行所有包的测试
 pnpm --filter @mitojs/node test      # 运行单个包的测试
 ```
+
+### Rust Agent 测试
+
+**框架：** cargo test（内置）+ serial_test + tower（端点测试）
+
+**测试约定：**
+- **公开 API 测试** → 独立 `tests.rs` 文件，通过对应模块 `mod.rs` 中 `#[cfg(test)] mod tests;` 引入
+- **私有函数测试** → 源文件末尾行内 `#[cfg(test)] mod tests` 模块（Rust 要求同文件才能访问私有函数）
+- 涉及全局状态（`PROCESS_DATA`）的测试使用 `#[serial]` 宏串行执行，测试前调用 `PROCESS_DATA.lock().unwrap().clear()` 清理状态
+- HTTP 端点测试使用 `tower::ServiceExt::oneshot` 构造虚拟请求，无需启动真实 HTTP 服务器
+
+**测试位置：**
+- `agent/src/helper/tests.rs` — helper 模块公开 API（error、config、constants、path）
+- `agent/src/data_processor/tests.rs` — Store CRUD、指标分发、枚举序列化
+- `agent/src/data_processor/subscribe.rs`（行内）— `process_data()` 私有函数
+- `agent/src/ipc/process.rs`（行内）— `IpcMessage` 序列化、`get_ipc_path()`
+- `agent/src/ipc/http/http.rs`（行内）— `classify_server_error()` 私有函数
+- `agent/src/ipc/http/endpoints/tests.rs` — HTTP 端点集成测试（info、heartbeat、metrics、update_process）
+
+**运行测试：**
+```bash
+cd agent && cargo test               # 运行所有 Rust Agent 测试
+cargo test -- --nocapture             # 运行并显示 println 输出
+cargo test <test_name>                # 运行单个测试
+```
+
+**新增功能时必须补充单测：**
+- 新增或修改 `helper/`、`data_processor/`、`ipc/` 下的逻辑时，必须在对应的 `tests.rs` 或行内测试模块中补充测试用例。
+- 新增 HTTP 端点时，在 `agent/src/ipc/http/endpoints/tests.rs` 中添加路由测试。
+- 新增公开结构体或枚举时，补充序列化/反序列化往返测试。
+- 提交前执行 `cd agent && cargo test` 确保全部通过。
 
 ---
 

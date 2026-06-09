@@ -36,3 +36,36 @@ pub fn send_ipc_message(message: IpcMessage) {
         // std::process::exit(1);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::helper::constants::IpcMessageCode;
+
+    #[test]
+    fn test_ipc_message_serialize() {
+        let msg = IpcMessage {
+            code: IpcMessageCode::Ok,
+            message: "success".to_string(),
+        };
+        let json: serde_json::Value = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["code"], 200);
+        assert_eq!(json["message"], "success");
+
+        let msg_err = IpcMessage {
+            code: IpcMessageCode::Err,
+            message: "failed".to_string(),
+        };
+        let json_err: serde_json::Value = serde_json::to_value(&msg_err).unwrap();
+        assert_eq!(json_err["code"], 500);
+        assert_eq!(json_err["message"], "failed");
+    }
+
+    #[test]
+    fn test_get_ipc_path() {
+        let path = get_ipc_path();
+        assert!(!path.is_empty());
+        // macOS: /dev/fd/3, Linux: /proc/self/fd/3
+        assert!(path.contains("fd/3"));
+    }
+}

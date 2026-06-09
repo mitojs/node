@@ -3,6 +3,7 @@ import { program } from 'commander'
 import { registry } from './core/registry.js'
 import { logger } from './logger.js'
 import { registerBuiltinPlugins } from './plugins/index.js'
+import { AgentClient } from './services/agent-client.js'
 import { InspectorSession } from './services/inspector-session.js'
 import { createOutputFormatter } from './services/output-formatter.js'
 
@@ -52,6 +53,13 @@ for (const plugin of registry.getAll()) {
 		const json = globalOpts.json ?? false
 		const output = createOutputFormatter(json)
 
+		// 自动检测 Agent 是否可用
+		const agentClient = new AgentClient()
+		const agentAvailable = await agentClient.isAvailable()
+		if (agentAvailable) {
+			logger.debug('Agent detected, SDK channel available')
+		}
+
 		const session = new InspectorSession()
 		try {
 			await session.open(pid, resolvedPort)
@@ -62,7 +70,10 @@ for (const plugin of registry.getAll()) {
 		}
 
 		try {
-			const result = await plugin.execute({ pid, port: resolvedPort, json, session, output }, cmdOptions)
+			const result = await plugin.execute(
+				{ pid, port: resolvedPort, json, session, agentClient: agentAvailable ? agentClient : undefined, output },
+				cmdOptions
+			)
 			if (result.success) {
 				output({ success: true, command: plugin.name, data: result.data })
 			} else {

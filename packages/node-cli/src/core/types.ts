@@ -1,3 +1,4 @@
+import type { AgentClient } from '../services/agent-client.js'
 import type { InspectorSession } from '../services/inspector-session.js'
 
 export interface PluginOption {
@@ -11,6 +12,7 @@ export interface DiagnosticContext {
 	port: number
 	json: boolean
 	session: InspectorSession
+	agentClient?: AgentClient
 	output: (data: OutputData) => void
 }
 

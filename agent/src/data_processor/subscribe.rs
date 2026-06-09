@@ -76,3 +76,31 @@ fn handle_action(action_info: ProcessActionInfo) -> Result<(), String> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_process_data_metric() {
+        let json = r#"{"command_type":"metric","process_id":1,"metric_type":"cpu"}"#;
+        assert!(process_data(json).is_ok());
+    }
+
+    #[test]
+    fn test_process_data_action() {
+        let json = r#"{"command_type":"action","process_id":1,"action_type":"get_cpu_profile"}"#;
+        assert!(process_data(json).is_ok());
+    }
+
+    #[test]
+    fn test_process_data_invalid_json() {
+        assert!(process_data("not json at all").is_err());
+    }
+
+    #[test]
+    fn test_process_data_missing_command_type() {
+        let json = r#"{"process_id":1}"#;
+        assert!(process_data(json).is_err());
+    }
+}

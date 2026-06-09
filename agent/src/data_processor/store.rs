@@ -73,11 +73,33 @@ pub struct BaseCommandData {
     pub command_type: CommandType,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessMetrics {
+    pub cpu: Option<serde_json::Value>,
+    pub memory: Option<serde_json::Value>,
+    pub errors: Vec<serde_json::Value>,
+    pub timers: Vec<serde_json::Value>,
+    pub last_updated: u64,
+}
+
+impl ProcessMetrics {
+    pub fn new() -> Self {
+        Self {
+            cpu: None,
+            memory: None,
+            errors: Vec::new(),
+            timers: Vec::new(),
+            last_updated: 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ProcessStore {
     pub uds_port: u16,
     // timestamp second
     pub latest_heartbeat_time: u64,
+    pub metrics: ProcessMetrics,
 }
 
 #[derive(Debug)]
@@ -117,10 +139,35 @@ impl Store {
                 latest_heartbeat_time: value
                     .latest_heartbeat_time
                     .unwrap_or(old.latest_heartbeat_time),
+                metrics: old.metrics.clone(),
             };
             data.insert(*key, new);
         }
-        // 如果没有旧值，则不设置新值
+    }
+
+    pub fn update_metrics(&self, pid: &u16, subject: &str, metric_data: serde_json::Value) {
+        let mut data = PROCESS_DATA.lock().unwrap();
+        let store = data.entry(*pid).or_insert_with(|| ProcessStore {
+            uds_port: 0,
+            latest_heartbeat_time: 0,
+            metrics: ProcessMetrics::new(),
+        });
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        store.metrics.last_updated = now;
+        match subject {
+            "cpu" | "CPU" => store.metrics.cpu = Some(metric_data),
+            "memory" | "Memory" => store.metrics.memory = Some(metric_data),
+            "js_error" | "JSError" => store.metrics.errors.push(metric_data),
+            "timeout" | "Timeout" => store.metrics.timers.push(metric_data),
+            _ => {}
+        }
+    }
+
+    pub fn get_metrics(&self, pid: &u16) -> Option<ProcessMetrics> {
+        PROCESS_DATA.lock().unwrap().get(pid).map(|s| s.metrics.clone())
     }
 
     pub fn get(&self, pid: &u16) -> Option<ProcessStore> {

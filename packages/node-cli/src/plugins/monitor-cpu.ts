@@ -10,7 +10,7 @@ export const monitorCpuPlugin: DiagnosticPlugin = {
 	async execute(ctx) {
 		let lastCpuData: { user: number; system: number; hrtime: bigint } | null = null
 
-		const getCPUData = async (): Promise<number> => {
+		const getCPUDataFromInspector = async (): Promise<number> => {
 			const data = await ctx.session.evaluate(
 				FUNCTION_WRAPPER(`
 					const usage = process.cpuUsage();
@@ -30,6 +30,16 @@ export const monitorCpuPlugin: DiagnosticPlugin = {
 			if (timeDiff <= 0) return 0
 			return Math.min(((userDiff + systemDiff) / timeDiff) * 100, 100)
 		}
+
+		const getCPUDataFromAgent = async (): Promise<number> => {
+			const metrics = await ctx.agentClient!.getMetrics(ctx.pid)
+			if (metrics?.cpu) {
+				return (metrics.cpu as any).load ?? 0
+			}
+			return getCPUDataFromInspector()
+		}
+
+		const getCPUData = ctx.agentClient ? getCPUDataFromAgent : getCPUDataFromInspector
 
 		if (ctx.json) {
 			while (true) {
