@@ -16,6 +16,7 @@ use super::{
     common::BaseRouter,
     endpoints::{
         heartbeat::HEARTBEAT_ROUTER, info::INFO_ROUTER, update_process::UPDATE_PROCESS_ROUTER,
+        processes::{LIST_PROCESSES_ROUTER, RECORD_METRIC_ROUTER, REGISTER_PROCESS_ROUTER},
     },
 };
 
@@ -33,7 +34,14 @@ pub async fn setup_http_server(
         .route("/", get(get_agent_name))
         .layer(CorsLayer::permissive()); // CORS 支持
 
-    const ROUTERS: [&dyn BaseRouter; 3] = [&INFO_ROUTER, &UPDATE_PROCESS_ROUTER, &HEARTBEAT_ROUTER];
+    const ROUTERS: [&dyn BaseRouter; 6] = [
+        &INFO_ROUTER,
+        &UPDATE_PROCESS_ROUTER,
+        &HEARTBEAT_ROUTER,
+        &LIST_PROCESSES_ROUTER,
+        &REGISTER_PROCESS_ROUTER,
+        &RECORD_METRIC_ROUTER,
+    ];
     for router in ROUTERS {
         app = app.route(router.get_path(), (router.get_handler())());
     }

@@ -9,11 +9,14 @@ import { createHttpServer, DEFAULT_TCP_PORT, IpcMessageCode } from '../shared'
 	// 创建 HTTP 服务器，端口为默认端口 + 1 (16667)
 	// 用于接收 Rust Agent 下发的监控指令和数据
 	const http = await createHttpServer(DEFAULT_TCP_PORT + 1)
-	console.log('http', http.address())
+	const address = http.address()
+	const port = typeof address === 'object' && address !== null ? address.port : DEFAULT_TCP_PORT + 1
+	console.log('http', address)
 
 	// 向主线程发送初始化成功消息
 	// 通知主线程代理服务器已成功启动
 	parentPort?.postMessage({
 		code: IpcMessageCode.Ok,
+		message: String(port),
 	})
 })()

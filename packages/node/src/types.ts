@@ -8,8 +8,19 @@ export interface ConfigType {
 }
 
 export interface RegisterProcessData {
-	pid: number
-	udsPath: string
+	process_id: number
+	proxy_port: number
+}
+
+export interface RecordMetricData {
+	process_id: number
+	metric_type: 'cpu' | 'memory' | 'js_error' | 'timeout'
+	data: unknown
+}
+
+export interface AgentBaseResponse {
+	success: boolean
+	message: string
 }
 
 export interface IpcMessage {
@@ -22,5 +33,6 @@ export interface MitoNodeOption {
 		[SubjectNames.CPU]?: boolean
 		[SubjectNames.Memory]?: boolean
 		[SubjectNames.JSError]?: boolean
+		[SubjectNames.Timeout]?: boolean
 	}
 }

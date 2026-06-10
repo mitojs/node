@@ -57,6 +57,16 @@ fn handle_metric(metric_info: ProcessMetricInfo) -> Result<(), String> {
             // TODO: 实现内存指标处理逻辑
             Ok(())
         }
+        MetricType::JsError => {
+            log_print!("🚨 处理 JS Error 指标");
+            // TODO: 实现 JS Error 指标处理逻辑
+            Ok(())
+        }
+        MetricType::Timeout => {
+            log_print!("⏱️ 处理 Timeout 指标");
+            // TODO: 实现 Timeout 指标处理逻辑
+            Ok(())
+        }
     }
 }
 

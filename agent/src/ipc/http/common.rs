@@ -21,7 +21,7 @@ pub struct InfoResponse {
 
 #[derive(Deserialize)]
 pub struct UpdateProcessRequest {
-    pub process_id: u16,
+    pub process_id: u32,
     pub action: String,
     pub data: Option<serde_json::Value>,
 }

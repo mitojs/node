@@ -18,7 +18,7 @@ interface PlatformInfo {
 /**
  * 获取当前平台信息
  */
-function getPlatformInfo(): PlatformInfo {
+export function getPlatformInfo(): PlatformInfo {
 	const currentPlatform = platform()
 	const currentArch = arch()
 
@@ -161,13 +161,21 @@ export class MitojsAgent {
 	getPid(): number | undefined {
 		return this.process?.pid
 	}
+
+	isRunning(): boolean {
+		return this.process !== null
+	}
+}
+
+export function createAgent(): MitojsAgent {
+	return new MitojsAgent()
 }
 
 /**
  * 创建 Agent 实例
  */
 export async function initAgent(): Promise<MitojsAgent> {
-	const agent = new MitojsAgent()
+	const agent = createAgent()
 	await agent.start()
 	return agent
 }

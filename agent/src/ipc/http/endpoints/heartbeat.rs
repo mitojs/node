@@ -21,7 +21,7 @@ pub struct HeartbeatRouter {
 
 #[derive(Deserialize)]
 pub struct HeartbeatRequest {
-    process_id: u16,
+    process_id: u32,
 }
 
 impl BaseRouter for HeartbeatRouter {
@@ -51,7 +51,7 @@ pub async fn heartbeat(
     PROCESS_MAP_STORE.update(
         &payload.process_id,
         PartialProcessStore {
-            uds_port: None,
+            proxy_port: None,
             latest_heartbeat_time: Some(secs),
         },
     );

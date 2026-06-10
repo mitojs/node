@@ -4,6 +4,13 @@ import { logger, SubjectNames } from '../shared'
 import { BaseMonitoringSubject } from './base'
 
 export class JSErrorSubject extends BaseMonitoringSubject<Error> {
+	constructor(options?: { interval: number }) {
+		super(options)
+		this.collector?.subscribe?.((error) => {
+			this.next(error)
+		})
+	}
+
 	protected createCollector(): BaseCollector<Error> {
 		return new JsErrorCollector()
 	}
@@ -12,8 +19,10 @@ export class JSErrorSubject extends BaseMonitoringSubject<Error> {
 		return SubjectNames.JSError
 	}
 
-	// 重写start方法，JS-Error SUbject不需要轮询，通过事件监听实时通知
+	// JS errors are pushed by process event listeners, so this subject does not need polling.
 	start() {
-		logger.error('JSErrorSubject.start() is not needed, errors are notified in real-time via event listeners')
+		if (this.closed) {
+			logger.error(`${this.getSubjectName()} start error, subject is closed`)
+		}
 	}
 }

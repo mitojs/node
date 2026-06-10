@@ -2,6 +2,7 @@ import path, { resolve } from 'node:path'
 import { SHARE_ENV, Worker } from 'node:worker_threads'
 import deepMerge from 'deepmerge'
 import { configMap } from './config'
+import { registerProcessToAgent as defaultRegisterProcessToAgent } from './request'
 import {
 	DEFAULT_TCP_PORT,
 	IpcMessageCode,
@@ -13,6 +14,16 @@ import {
 	SubjectNames,
 } from './shared'
 import type { IpcMessage, MitoNodeOption } from './types'
+
+export interface ProxyThread {
+	worker: Worker
+	port: number
+}
+
+interface SyncToAgentDeps {
+	registerProcessToAgent?: typeof defaultRegisterProcessToAgent
+	proxyPort?: number
+}
 
 export function preCheck() {
 	if (global[MITO_NODE]) {
@@ -29,6 +40,7 @@ export function initConfig() {
 		agentTCPPort: Number(process.env.MITO_AGENT_TCP_PORT) || DEFAULT_TCP_PORT,
 		agentHost: 'localhost',
 		pid: process.pid,
+		dir: process.cwd(),
 	})
 }
 
@@ -37,6 +49,7 @@ export const DEFAULT_MITO_NODE_OPTION: MitoNodeOption = {
 		[SubjectNames.CPU]: true,
 		[SubjectNames.Memory]: true,
 		[SubjectNames.JSError]: true,
+		[SubjectNames.Timeout]: true,
 	},
 }
 
@@ -44,12 +57,13 @@ export function initOption(option?: MitoNodeOption) {
 	return deepMerge(DEFAULT_MITO_NODE_OPTION, option || {})
 }
 
-export async function initProxyThread() {
-	return new Promise((resolve, reject) => {
+export async function initProxyThread(): Promise<ProxyThread | undefined> {
+	return new Promise<ProxyThread | undefined>((resolve, reject) => {
 		if (!isSupportWorker || !isSupportInspectWorker) {
 			logger.info(
 				'It would not enable proxy thread because current Node.js version do not support connectToMainThread API'
 			)
+			resolve(undefined)
 			return
 		}
 
@@ -87,7 +101,10 @@ export async function initProxyThread() {
 				worker.on('exit', (exitCode) => {
 					logger.info(`worker exit with code: ${exitCode}`)
 				})
-				resolve(worker)
+				resolve({
+					worker,
+					port: Number(message.message) || DEFAULT_TCP_PORT + 1,
+				})
 			} else {
 				onError(new Error(message.message))
 			}
@@ -96,10 +113,13 @@ export async function initProxyThread() {
 }
 
 /**
- * 同步当前进程信息到 agent，并拉取配置 agent 监听的 uds，用来传输 Metrics 数据
+ * 同步当前进程信息到 agent，并登记本地 proxy worker 端口。
  */
-export async function SyncToAgent() {
-	// 同步当前进程信息到 agent
-	// await registerProcessToAgent()
-	// await getUDSPathFromAgent()
+export async function SyncToAgent(deps: SyncToAgentDeps = {}) {
+	const registerProcessToAgent = deps.registerProcessToAgent ?? defaultRegisterProcessToAgent
+
+	await registerProcessToAgent({
+		process_id: configMap.get('pid'),
+		proxy_port: deps.proxyPort ?? DEFAULT_TCP_PORT + 1,
+	})
 }
