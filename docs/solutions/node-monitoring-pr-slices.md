@@ -13,7 +13,9 @@ scripts/stage-node-monitoring-pr-slice.sh <slice>
 
 - Current branch: `feat-vite`
 - Remote: `origin git@github.com:mitojs/node.git`
-- Working tree status: uncommitted, multi-area diff
+- Current pushed head: run `git rev-parse origin/feat-vite` after `git fetch origin feat-vite`
+- Current PR handoff: `docs/solutions/node-monitoring-pr-handoff.md`
+- Working tree status: runtime PR files are committed and pushed; local generated binary/demo/test-guide files are intentionally left out.
 
 ## Do Not Stage By Default
 
@@ -234,6 +236,8 @@ Purpose: preserve the learning path and evidence trail separately from runtime c
 Files:
 
 - `docs/solutions/node-monitoring-handbook.md`
+- `docs/solutions/node-monitoring-pr-body.md`
+- `docs/solutions/node-monitoring-pr-handoff.md`
 - `docs/solutions/node-process-analysis-plan.md`
 - `docs/solutions/node-monitoring-pr-slices.md`
 - `docs/superpowers/plans/2026-06-11-analyze-first-cut.md`

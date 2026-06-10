@@ -130,6 +130,8 @@ case "$slice" in
 	booklet)
 		stage_existing \
 			docs/solutions/node-monitoring-handbook.md \
+			docs/solutions/node-monitoring-pr-body.md \
+			docs/solutions/node-monitoring-pr-handoff.md \
 			docs/solutions/node-process-analysis-plan.md \
 			docs/solutions/node-monitoring-pr-slices.md \
 			docs/superpowers/plans/2026-06-11-analyze-first-cut.md \
