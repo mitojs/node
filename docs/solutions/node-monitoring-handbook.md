@@ -25,13 +25,22 @@
 4. 后续再补 `mito-node discover`、Codex Skill、Claude Code 适配和 NodeAgent。
 5. 每一节都应该是一个可 review 的小 PR，不做混杂大 PR。
 
-2026-06-11 本地复核补充：
+2026-06-11 本地复核补充，以下是实现前的基线判断：
 
 1. `packages/node-cli/src/bin.ts` 仍然是全局 `--pid` + 低层子命令模式，还没有稳定的 `discover/analyze` 合约。
 2. `packages/node-cli/src/cli.ts` 仍然直接发送 `SIGUSR1`、默认连接 `9229`，并在结束时调用 `require('inspector').close()`，因此 inspector 生命周期仍是首要风险。
 3. `packages/node/src/client.ts` 已能启动 Rust Agent 和 proxy thread，但 subject 初始化和 SDK 到 Agent 的指标上报链路还没有真正启用。
 4. `agent/src/main.rs` 已有 axum/tokio HTTP 服务启动骨架，store、subscribe、endpoint 仍需要按 NodeAgent MVP 分阶段补齐。
 5. 因此当前执行顺序不变：先用 CLI 跑通一次性诊断闭环，再做 skill 适配，最后推进 SDK + Agent 长期监控链路。
+
+2026-06-11 MVP 实现后状态：
+
+1. `mito-node analyze --pid --json` 已有稳定入口，会通过 Inspector/CDP 采集 memory、process report、CPU profile，并写入本地 bundle。
+2. `mito-node discover --json` 已有稳定入口，会列出候选 Node 进程，并尽量关联 inspector listen 端口。
+3. Rust Agent 已有本地 HTTP contract：`GET /processes`、`POST /processes/register`、`POST /metrics`；进程注册字段使用 `proxy_port`，并兼容旧 `uds_port`。
+4. SDK `MitoNode.start()` 已能启动 Agent、启动 proxy worker、注册当前进程，并把 CPU、memory、JS error、timeout subject 指标写入 Agent。
+5. CLI 已有 `mito-node agent status/processes/metrics`，可以查询 Agent 当前缓存的进程和最近指标。
+6. 当前 PR 因 `bin.ts` 同时接入多条命令入口，被整理成一个完整 MVP 提交；后续 review 仍按 `docs/solutions/node-monitoring-pr-slices.md` 的切片顺序理解。
 
 ### 0.2 飞书原始规划补充
 
@@ -171,16 +180,18 @@ CLI 是一次性采集，NodeAgent 是长期运行。
 
 ### 2.2 当前最关键的问题
 
-| 优先级 | 问题 | 影响 |
-| --- | --- | --- |
-| P0 | 没有稳定 `discover/analyze` 合约 | Codex、Claude Code、脚本都无法稳定接入 |
-| P0 | inspector 生命周期不安全 | 可能误连进程，也可能关闭用户原本开启的 inspector |
-| P0 | 进程发现太弱 | 只靠 `pgrep node`，没有端口归属和 PID 校验 |
-| P0 | bundle 结构未定义 | Agent 不知道读哪个文件，也不知道哪些采集失败 |
-| P1 | `upload()` 是空实现 | 在线 URL 输出不可信 |
-| P1 | `monitor-cpu` 是随机数据 | 不能作为正式监控能力 |
-| P1 | TUI 和 Agent 模式没有清晰边界 | 人机使用方式会互相污染 |
-| P2 | SDK 到 Rust Agent 主链路未完成 | 长期 NodeAgent 还不能作为首版依赖 |
+这张表保留原始风险，同时记录 MVP 后的处理状态，避免后续 review 时把已经落地的能力误判成仍未开始。
+
+| 优先级 | 原始问题 | 影响 | 当前状态 |
+| --- | --- | --- | --- |
+| P0 | 没有稳定 `discover/analyze` 合约 | Codex、Claude Code、脚本都无法稳定接入 | 已落地 `discover` 和 `analyze` 命令，仍待 CI 化 contract tests |
+| P0 | inspector 生命周期不安全 | 可能误连进程，也可能关闭用户原本开启的 inspector | 已抽出 Inspector client/session；仍需更多真实进程边界测试 |
+| P0 | 进程发现太弱 | 只靠 `pgrep node`，没有端口归属和 PID 校验 | 已引入 `ps` + `lsof` 解析和端口关联，跨平台细节仍待扩展 |
+| P0 | bundle 结构未定义 | Agent 不知道读哪个文件，也不知道哪些采集失败 | 已定义 manifest、summary、artifact status 和 readOrder |
+| P1 | `upload()` 是空实现 | 在线 URL 输出不可信 | 暂不纳入 MVP，当前 analyze 只承诺本地 bundle |
+| P1 | `monitor-cpu` 是随机数据 | 不能作为正式监控能力 | 暂不把旧低层命令作为正式监控面，新增 Agent metrics 查询 |
+| P1 | TUI 和 Agent 模式没有清晰边界 | 人机使用方式会互相污染 | CLI JSON 与 human output 已分离；TUI 仍是后续独立 PR |
+| P2 | SDK 到 Rust Agent 主链路未完成 | 长期 NodeAgent 还不能作为首版依赖 | 已打通 SDK -> Agent -> CLI query 的 MVP 链路 |
 
 ## 3. 学习路线总览
 
