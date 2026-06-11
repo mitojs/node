@@ -31,6 +31,7 @@ docs/solutions/node-monitoring-pr-body.md
 - Add `mito-node analyze` and `mito-node discover` flows backed by Inspector/CDP collection and local analysis bundles.
 - Add Rust Agent process/metrics HTTP endpoints plus SDK registration and metric reporting for cpu, memory, js_error, and timeout subjects.
 - Add `mito-node agent status/processes/metrics`, smoke/staging scripts, and the Node monitoring learning handbook with PR review slices.
+- Expand the handbook with an explicit Node.js runtime, monitoring/governance, and Rust Agent boundary knowledge map.
 
 ## Test Plan
 - [x] `pnpm --filter @mitojs/node exec jest --config jest.config.cjs --runInBand`

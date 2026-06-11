@@ -6,6 +6,8 @@
 
 本小册不是单纯的读书笔记，也不是一次性大方案。它的作用是把学习路线、代码路线、PR 拆分和验收方式放到一张图里，后续每推进一节，都可以独立开分支、提 PR、review、合入。
 
+这本小册的主线是 Node.js 监控，不是 Rust 入门。Rust 只在 Agent 章节出现，用来解释为什么这个项目需要一个常驻 sidecar，以及 Node SDK、CLI 和本地 Agent 之间怎么分工。
+
 ### 0.1 会话上下文
 
 - `sessionId`: `019d953d-601f-7383-8aab-0bcbd296c783`
@@ -215,6 +217,76 @@ Codex / Claude Code adapter
       v
 NodeAgent / SDK / IPC
 ```
+
+### 3.1 Node.js 知识地图
+
+先学 Node.js 运行时，再学监控工具。否则很容易只会调用 `process.memoryUsage()`，但不知道它在解释什么。
+
+| 知识块 | 要回答的问题 | 对应章节 | 对应代码 |
+| --- | --- | --- | --- |
+| 进程模型 | Node 进程、PID、父子进程、信号、启动参数是什么 | 第五节 | `packages/node-cli/src/discover/**` |
+| Inspector / CDP | 为什么 CLI 能 attach 到一个运行中的 Node 进程 | 第六节 | `packages/node-cli/src/inspector/**` |
+| V8 内存 | RSS、heapTotal、heapUsed、external、arrayBuffers 有什么区别 | 第七节 | `packages/node-cli/src/analyze/collectors.ts` |
+| CPU Profile | cpuprofile 记录的是 JS 调用栈采样，不是系统 CPU 总账 | 第九节 | `Profiler.start/stop` collector |
+| process.report | 为什么 report 能看到 libuv handles、资源限制、原生栈 | 第八节 | `process.report.getReport()` collector |
+| event loop / libuv | timer、socket、server、handle 泄漏如何影响进程存活 | 第十八节、第二十二节 | `TimeoutSubject`、report |
+| 错误事件 | `uncaughtException`、`unhandledRejection` 如何进入监控流 | 第十三节 | `JSErrorSubject` |
+
+读这本小册时，建议每个知识块都用两个问题验收：
+
+1. 这个指标来自 Node.js 哪一层：JS API、V8、libuv、Inspector，还是操作系统？
+2. 这个指标能直接说明问题，还是只能提示下一步采样？
+
+### 3.2 监控与治理知识地图
+
+这里的“监控监管”建议拆成两层：监控是采集和展示，治理是告警、限频、保留、审计和动作控制。
+
+| 能力 | 监控视角 | 治理视角 | 本项目当前状态 |
+| --- | --- | --- | --- |
+| 指标采样 | CPU、memory、JS error、timeout 持续上报 | 采样频率、payload 大小、异常降级 | SDK -> Agent MVP 已打通 |
+| 现场诊断 | memory/report/cpuprofile 一次性采集 | 超时、partial、bundle 留证 | `mito-node analyze` 已落地 |
+| 进程发现 | 找到候选 Node 进程和 inspector 端口 | 避免误连其他用户或其他进程 | `discover` 已落地，仍需更多边界测试 |
+| 数据缓存 | Agent 保留最近 metric snapshots | 保留窗口、历史查询、落盘策略 | 当前只保留 latest snapshots |
+| 动作下发 | 触发 profile、snapshot、report | 冷却时间、并发限制、权限控制 | 路线已写入自动触发章节，未进入 MVP |
+| 输出合约 | JSON 给 Agent，human output 给人 | schema 稳定、错误码、可审计证据 | analyze/agent CLI 已分离输出 |
+| 告警与监管 | 高 CPU、高内存、错误率、event loop 延迟 | 阈值来源、抖动控制、告警闭环 | 只定义路线，不在第一版实现 |
+
+因此，当前 PR 不是完整 APM 平台，而是把三件事先做稳：
+
+1. 本地诊断能拿到可信 bundle。
+2. SDK 能持续把核心指标送到本地 Agent。
+3. CLI 能查询 Agent 的进程和最近指标。
+
+### 3.3 Rust 在这本小册里的位置
+
+Rust 不是这本小册的学习主线，但它是项目架构的一层。它承担的是“常驻 Agent”角色：
+
+| 为什么用 Rust Agent | 对 Node 监控有什么价值 |
+| --- | --- |
+| 独立进程 | 业务 Node 主线程卡住时，Agent 仍可以保存已有状态和响应 CLI 查询 |
+| 低开销常驻 | 适合接收高频指标、做本地缓存和后续动作调度 |
+| 跨平台二进制 | SDK 可以启动对应平台的预编译 Agent |
+| 清晰隔离 | CLI 负责诊断命令，SDK 负责采样，Agent 负责本地状态 |
+
+现阶段只需要理解三个 Rust 文件：
+
+| 文件 | 学习目的 |
+| --- | --- |
+| `agent/src/ipc/http/endpoints/processes.rs` | HTTP endpoint 如何接收进程注册和指标 |
+| `agent/src/data_processor/store.rs` | Agent 如何保存进程状态和最近指标 |
+| `agent/src/ipc/http/http.rs` | axum/tokio HTTP 服务如何挂载路由 |
+
+不需要先学完整 Rust 语言再看本项目。先把 HTTP contract、store 数据结构、SDK/CLI 调用关系看懂，就足够支撑这轮 Node 监控学习。
+
+### 3.4 学习顺序建议
+
+如果目标是“边提 PR 边学”，建议按这个顺序读：
+
+1. 第五节到第九节：Node 进程、Inspector、memory、report、CPU profile。
+2. 第十节到第十一节：bundle 和 Agent 友好的 JSON 合约。
+3. 第十二节到第十四节：NodeAgent、SDK 指标链路、CLI 查询 Agent。
+4. 第十七节：UDS、TCP、HTTP 的通信边界。
+5. 第十八节到第二十节：Subject 单功能接入、高负载边界、自动触发诊断。
 
 每一节都要同时回答五个问题：
 
