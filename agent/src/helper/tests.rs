@@ -162,12 +162,25 @@ fn test_get_tmp_path_not_empty() {
 }
 
 #[test]
+#[cfg(not(target_os = "windows"))]
 fn test_get_socket_path_ends_with_sock() {
     let p = get_socket_path();
     let s = p.to_string_lossy();
     assert!(
         s.ends_with("_mito_node_.sock"),
         "socket path should end with _mito_node_.sock, got: {}",
+        s
+    );
+}
+
+#[test]
+#[cfg(target_os = "windows")]
+fn test_get_socket_path_named_pipe() {
+    let p = get_socket_path();
+    let s = p.to_string_lossy();
+    assert!(
+        s.starts_with(r"\\.\pipe\mito_node_"),
+        "socket path should be a Windows named pipe, got: {}",
         s
     );
 }

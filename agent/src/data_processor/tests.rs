@@ -237,3 +237,59 @@ fn test_enum_serde_action_type() {
     let parsed: ActionType = serde_json::from_str("\"get_memory_profile\"").unwrap();
     assert!(matches!(parsed, ActionType::GetMemoryProfile));
 }
+
+// ─── cleanup_expired ─────────────────────────────────────
+
+#[test]
+#[serial]
+fn test_cleanup_expired_removes_old_entries() {
+    clear_store();
+    let store = Store::new();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // 一个新鲜的条目（心跳在当前时间）
+    store.set(&1, make_store_entry(8080, now));
+    // 一个过期的条目（心跳在 600 秒前）
+    store.set(&2, make_store_entry(9090, now - 600));
+
+    store.cleanup_expired(300);
+
+    assert!(store.get(&1).is_some(), "新鲜条目不应被清理");
+    assert!(store.get(&2).is_none(), "过期条目应被清理");
+}
+
+#[test]
+#[serial]
+fn test_cleanup_expired_keeps_all_when_none_expired() {
+    clear_store();
+    let store = Store::new();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    store.set(&1, make_store_entry(8080, now));
+    store.set(&2, make_store_entry(9090, now - 100));
+
+    store.cleanup_expired(300);
+
+    assert!(store.get(&1).is_some());
+    assert!(store.get(&2).is_some());
+}
+
+#[test]
+#[serial]
+fn test_cleanup_expired_removes_zero_heartbeat() {
+    clear_store();
+    let store = Store::new();
+
+    // 心跳为 0 的条目（如 update_metrics 自动创建的）应被视为超时
+    store.set(&1, make_store_entry(8080, 0));
+
+    store.cleanup_expired(300);
+
+    assert!(store.get(&1).is_none(), "心跳为 0 的条目应被清理");
+}

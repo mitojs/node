@@ -52,8 +52,8 @@ pub struct GetMemoryProfileActionData {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProcessMetricInfo {
-    pub process_id: u16,
-    pub thread_id: Option<u16>,
+    pub process_id: u32,
+    pub thread_id: Option<u32>,
     pub metric_type: MetricType,
     pub command_type: CommandType,
     // data: Box<T>,
@@ -61,8 +61,8 @@ pub struct ProcessMetricInfo {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProcessActionInfo {
-    pub process_id: u16,
-    pub thread_id: Option<u16>,
+    pub process_id: u32,
+    pub thread_id: Option<u32>,
     pub action_type: ActionType,
     pub command_type: CommandType,
     // data: Box<T>,
@@ -110,7 +110,7 @@ pub struct PartialProcessStore {
 }
 
 // 将数据存储改为静态变量，只对数据加锁
-pub static PROCESS_DATA: LazyLock<Mutex<HashMap<u16, ProcessStore>>> =
+pub static PROCESS_DATA: LazyLock<Mutex<HashMap<u32, ProcessStore>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug)]
@@ -121,15 +121,15 @@ impl Store {
         Self
     }
 
-    pub fn get_data(&self) -> std::sync::MutexGuard<HashMap<u16, ProcessStore>> {
+    pub fn get_data(&self) -> std::sync::MutexGuard<HashMap<u32, ProcessStore>> {
         PROCESS_DATA.lock().unwrap()
     }
 
-    pub fn set(&self, key: &u16, value: ProcessStore) -> () {
+    pub fn set(&self, key: &u32, value: ProcessStore) -> () {
         PROCESS_DATA.lock().unwrap().insert(*key, value);
     }
 
-    pub fn update(&self, key: &u16, value: PartialProcessStore) -> () {
+    pub fn update(&self, key: &u32, value: PartialProcessStore) -> () {
         let mut data = PROCESS_DATA.lock().unwrap();
         let old = data.get(key);
 
@@ -145,7 +145,7 @@ impl Store {
         }
     }
 
-    pub fn update_metrics(&self, pid: &u16, subject: &str, metric_data: serde_json::Value) {
+    pub fn update_metrics(&self, pid: &u32, subject: &str, metric_data: serde_json::Value) {
         let mut data = PROCESS_DATA.lock().unwrap();
         let store = data.entry(*pid).or_insert_with(|| ProcessStore {
             uds_port: 0,
@@ -166,16 +166,31 @@ impl Store {
         }
     }
 
-    pub fn get_metrics(&self, pid: &u16) -> Option<ProcessMetrics> {
+    pub fn get_metrics(&self, pid: &u32) -> Option<ProcessMetrics> {
         PROCESS_DATA.lock().unwrap().get(pid).map(|s| s.metrics.clone())
     }
 
-    pub fn get(&self, pid: &u16) -> Option<ProcessStore> {
+    pub fn get(&self, pid: &u32) -> Option<ProcessStore> {
         PROCESS_DATA.lock().unwrap().get(pid).cloned()
     }
 
-    pub fn remove(&self, pid: &u16) -> Option<ProcessStore> {
+    pub fn remove(&self, pid: &u32) -> Option<ProcessStore> {
         PROCESS_DATA.lock().unwrap().remove(pid)
+    }
+
+    /// 清理心跳超时的进程条目
+    ///
+    /// 移除 `latest_heartbeat_time` 距当前时间超过 `timeout_secs` 秒的所有条目。
+    /// 心跳为 0 的条目（刚通过 update_metrics 自动创建但从未上报心跳）也会被清理。
+    pub fn cleanup_expired(&self, timeout_secs: u64) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let mut data = PROCESS_DATA.lock().unwrap();
+        data.retain(|_pid, store| {
+            now.saturating_sub(store.latest_heartbeat_time) <= timeout_secs
+        });
     }
 }
 

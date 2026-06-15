@@ -21,7 +21,7 @@ pub struct HeartbeatRouter {
 
 #[derive(Deserialize)]
 pub struct HeartbeatRequest {
-    process_id: u16,
+    process_id: u32,
 }
 
 impl BaseRouter for HeartbeatRouter {

@@ -5,6 +5,7 @@ export enum SubjectNames {
 	CPU = 'CPU',
 	JSError = 'JSError',
 	Memory = 'Memory',
+	Timeout = 'Timeout',
 	FD = 'FD',
 }
 

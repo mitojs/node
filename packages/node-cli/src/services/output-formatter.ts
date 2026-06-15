@@ -12,6 +12,9 @@ export function createOutputFormatter(json: boolean): (data: OutputData) => void
 			}
 		} else if (!data.success && data.error) {
 			console.error(`Error: ${data.error}`)
+			if (data.suggestion) {
+				console.error(`Suggestion: ${data.suggestion}`)
+			}
 		}
 	}
 }

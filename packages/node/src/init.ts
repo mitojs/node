@@ -1,7 +1,8 @@
-import path, { resolve } from 'node:path'
+import path from 'node:path'
 import { SHARE_ENV, Worker } from 'node:worker_threads'
 import deepMerge from 'deepmerge'
 import { configMap } from './config'
+import { getUDSPathFromAgent, registerProcessToAgent } from './request'
 import {
 	DEFAULT_TCP_PORT,
 	IpcMessageCode,
@@ -37,6 +38,7 @@ export const DEFAULT_MITO_NODE_OPTION: MitoNodeOption = {
 		[SubjectNames.CPU]: true,
 		[SubjectNames.Memory]: true,
 		[SubjectNames.JSError]: true,
+		[SubjectNames.Timeout]: true,
 	},
 }
 
@@ -96,10 +98,25 @@ export async function initProxyThread() {
 }
 
 /**
- * 同步当前进程信息到 agent，并拉取配置 agent 监听的 uds，用来传输 Metrics 数据
+ * 同步当前进程信息到 agent，并拉取 agent 监听的 uds 路径
  */
 export async function SyncToAgent() {
-	// 同步当前进程信息到 agent
-	// await registerProcessToAgent()
-	// await getUDSPathFromAgent()
+	try {
+		await registerProcessToAgent({
+			pid: process.pid,
+			udsPath: '',
+		})
+		logger.info('process registered to agent')
+	} catch (e) {
+		logger.debug('registerProcessToAgent failed:', (e as Error).message)
+	}
+
+	try {
+		const result = await getUDSPathFromAgent()
+		if (result?.data?.uds_path) {
+			logger.info(`agent UDS path: ${result.data.uds_path}`)
+		}
+	} catch (e) {
+		logger.debug('getUDSPathFromAgent failed:', (e as Error).message)
+	}
 }

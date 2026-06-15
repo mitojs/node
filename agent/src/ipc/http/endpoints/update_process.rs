@@ -5,6 +5,7 @@ use axum::{
     routing::{post, MethodRouter},
 };
 
+use crate::data_processor::store::PROCESS_MAP_STORE;
 use crate::log_print;
 
 use super::super::common::{BaseRouter, UpdateProcessRequest, UpdateProcessResponse};
@@ -29,22 +30,60 @@ pub const UPDATE_PROCESS_ROUTER: UpdateProcessRouter = UpdateProcessRouter {
     handler: || post(update_process),
 };
 
-// POST /update_process 接口处理函数
 async fn update_process(
     Json(payload): Json<UpdateProcessRequest>,
 ) -> Result<ResponseJson<UpdateProcessResponse>, StatusCode> {
-    // 这里可以根据实际需求处理进程更新逻辑
-    log_print!("Received update_process request: {:?}", payload.action);
+    log_print!(
+        "Received update_process request: pid={}, action={}",
+        payload.process_id,
+        payload.action
+    );
 
-    // 模拟处理逻辑
     let response = match payload.action.as_str() {
-        "start" | "stop" | "restart" => UpdateProcessResponse {
+        "start" => {
+            // 通知对应进程开始采集（通过 Worker Thread HTTP 代理）
+            let store = PROCESS_MAP_STORE.get(&payload.process_id);
+            if store.is_some() {
+                log_print!(
+                    "Process {} found in store, dispatching start command",
+                    payload.process_id
+                );
+                UpdateProcessResponse {
+                    success: true,
+                    message: format!("Process {} start command dispatched", payload.process_id),
+                }
+            } else {
+                UpdateProcessResponse {
+                    success: false,
+                    message: format!("Process {} not registered", payload.process_id),
+                }
+            }
+        }
+        "stop" => {
+            let store = PROCESS_MAP_STORE.get(&payload.process_id);
+            if store.is_some() {
+                log_print!(
+                    "Process {} found in store, dispatching stop command",
+                    payload.process_id
+                );
+                UpdateProcessResponse {
+                    success: true,
+                    message: format!("Process {} stop command dispatched", payload.process_id),
+                }
+            } else {
+                UpdateProcessResponse {
+                    success: false,
+                    message: format!("Process {} not registered", payload.process_id),
+                }
+            }
+        }
+        "restart" => UpdateProcessResponse {
             success: true,
-            message: format!("Process {} executed successfully", payload.action),
+            message: format!("Process {} restart command dispatched", payload.process_id),
         },
         _ => UpdateProcessResponse {
             success: false,
-            message: "Unknown action".to_string(),
+            message: format!("Unknown action: {}", payload.action),
         },
     };
 

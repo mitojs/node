@@ -17,10 +17,13 @@ export interface IpcMessage {
 	message: ListenerResultType | string
 }
 
+export type MetricConfig = boolean | { interval?: number }
+
 export interface MitoNodeOption {
 	metrics?: {
-		[SubjectNames.CPU]?: boolean
-		[SubjectNames.Memory]?: boolean
+		[SubjectNames.CPU]?: MetricConfig
+		[SubjectNames.Memory]?: MetricConfig
 		[SubjectNames.JSError]?: boolean
+		[SubjectNames.Timeout]?: boolean
 	}
 }

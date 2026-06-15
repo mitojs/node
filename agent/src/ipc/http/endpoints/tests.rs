@@ -67,14 +67,35 @@ async fn post_update_process(action: &str) -> serde_json::Value {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_update_process_start() {
+    clear_store();
+    // 预先注册进程到 Store
+    PROCESS_MAP_STORE.set(
+        &1,
+        ProcessStore {
+            uds_port: 0,
+            latest_heartbeat_time: 0,
+            metrics: ProcessMetrics::new(),
+        },
+    );
     let json = post_update_process("start").await;
     assert_eq!(json["success"], true);
     assert!(json["message"].as_str().unwrap().contains("start"));
 }
 
 #[tokio::test]
+#[serial]
 async fn test_update_process_stop() {
+    clear_store();
+    PROCESS_MAP_STORE.set(
+        &1,
+        ProcessStore {
+            uds_port: 0,
+            latest_heartbeat_time: 0,
+            metrics: ProcessMetrics::new(),
+        },
+    );
     let json = post_update_process("stop").await;
     assert_eq!(json["success"], true);
 }
@@ -89,7 +110,7 @@ async fn test_update_process_restart() {
 async fn test_update_process_unknown() {
     let json = post_update_process("explode").await;
     assert_eq!(json["success"], false);
-    assert_eq!(json["message"], "Unknown action");
+    assert!(json["message"].as_str().unwrap().contains("Unknown action"));
 }
 
 // ─── POST /heartbeat ────────────────────────────────────

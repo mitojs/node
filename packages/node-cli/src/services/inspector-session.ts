@@ -22,6 +22,25 @@ interface RequestContext {
 	reject: (reason: Error) => void
 }
 
+export enum InspectorErrorCode {
+	SIGNAL_FAILED = 'SIGNAL_FAILED',
+	TIMEOUT = 'TIMEOUT',
+	PORT_UNREACHABLE = 'PORT_UNREACHABLE',
+	WEBSOCKET_FAILED = 'WEBSOCKET_FAILED',
+	INFO_FETCH_FAILED = 'INFO_FETCH_FAILED',
+}
+
+export class InspectorError extends Error {
+	code: InspectorErrorCode
+	suggestion: string
+
+	constructor(code: InspectorErrorCode, message: string, suggestion: string) {
+		super(message)
+		this.code = code
+		this.suggestion = suggestion
+	}
+}
+
 export class InspectorSession extends EventEmitter {
 	private client!: WebSocket
 	private requestId = 1
@@ -34,7 +53,26 @@ export class InspectorSession extends EventEmitter {
 		try {
 			process.kill(pid, 'SIGUSR1')
 		} catch (e) {
-			throw new Error(`failed to start inspector: ${(e as Error).message}`)
+			const err = e as NodeJS.ErrnoException
+			if (err.code === 'ESRCH') {
+				throw new InspectorError(
+					InspectorErrorCode.SIGNAL_FAILED,
+					`Process ${pid} does not exist`,
+					'Verify the PID is correct and the process is still running.'
+				)
+			}
+			if (err.code === 'EPERM') {
+				throw new InspectorError(
+					InspectorErrorCode.SIGNAL_FAILED,
+					`Permission denied to signal process ${pid}`,
+					'Run with sufficient privileges (sudo) or ensure you own the target process.'
+				)
+			}
+			throw new InspectorError(
+				InspectorErrorCode.SIGNAL_FAILED,
+				`Failed to send SIGUSR1 to process ${pid}: ${err.message}`,
+				'Ensure the target process is a Node.js process and is accessible.'
+			)
 		}
 		const detect = (host: string): Promise<boolean> => {
 			return new Promise((resolve) => {
@@ -50,11 +88,15 @@ export class InspectorSession extends EventEmitter {
 		}
 		let i = INSPECTOR_CONNECT_RETRIES
 		while (i--) {
-			if (await detect('127.0.0.1')) break
-			if (await detect('::1')) break
+			if (await detect('127.0.0.1')) return
+			if (await detect('::1')) return
 			await new Promise((resolve) => setTimeout(resolve, INSPECTOR_RETRY_DELAY_MS))
-			if (i === 0) throw new Error('failed to start inspector: timeout')
 		}
+		throw new InspectorError(
+			InspectorErrorCode.TIMEOUT,
+			`Inspector did not start within ${INSPECTOR_CONNECT_RETRIES * INSPECTOR_RETRY_DELAY_MS}ms on port ${port}`,
+			`Ensure port ${port} is not occupied by another process. Try a different port with --port <port>.`
+		)
 	}
 
 	async connect(port: number): Promise<void> {

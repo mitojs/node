@@ -27,4 +27,6 @@ export interface OutputData {
 	command: string
 	data?: any
 	error?: string
+	errorCode?: string
+	suggestion?: string
 }

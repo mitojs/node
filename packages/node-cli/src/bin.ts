@@ -4,7 +4,7 @@ import { registry } from './core/registry.js'
 import { logger } from './logger.js'
 import { registerBuiltinPlugins } from './plugins/index.js'
 import { AgentClient } from './services/agent-client.js'
-import { InspectorSession } from './services/inspector-session.js'
+import { InspectorError, InspectorSession } from './services/inspector-session.js'
 import { createOutputFormatter } from './services/output-formatter.js'
 
 interface CmdOptions {
@@ -16,7 +16,7 @@ interface CmdOptions {
 registerBuiltinPlugins()
 
 program
-	.requiredOption('-p, --pid <pid>', 'process id of the target process')
+	.option('-p, --pid <pid>', 'process id of the target process')
 	.option('--port <port>', 'inspector port of the target process', '9229')
 	.option('--json', 'output in JSON format for programmatic consumption', false)
 
@@ -37,8 +37,8 @@ for (const plugin of registry.getAll()) {
 		logger.debug('options', globalOpts, plugin.name, cmdOptions)
 
 		const pid = Number(globalOpts.pid)
-		if (Number.isNaN(pid)) {
-			console.error('Error: --pid must be a valid number')
+		if (Number.isNaN(pid) || !globalOpts.pid) {
+			console.error('Error: --pid is required for this command')
 			process.exit(1)
 		}
 		try {
@@ -65,7 +65,11 @@ for (const plugin of registry.getAll()) {
 			await session.open(pid, resolvedPort)
 			await session.connect(resolvedPort)
 		} catch (e: any) {
-			output({ success: false, command: plugin.name, error: e.message })
+			if (e instanceof InspectorError) {
+				output({ success: false, command: plugin.name, error: e.message, errorCode: e.code, suggestion: e.suggestion })
+			} else {
+				output({ success: false, command: plugin.name, error: e.message })
+			}
 			process.exit(1)
 		}
 
@@ -93,3 +97,10 @@ for (const plugin of registry.getAll()) {
 }
 
 program.parse(process.argv)
+
+// 无子命令时自动进入 TUI 交互模式
+const userArgs = process.argv.slice(2)
+const hasSubcommand = registry.getAll().some((p) => userArgs.includes(p.name))
+if (!userArgs.length || (!hasSubcommand && !userArgs.includes('--help') && !userArgs.includes('-h'))) {
+	import('./interactive-cli.js')
+}

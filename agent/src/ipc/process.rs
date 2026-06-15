@@ -1,4 +1,3 @@
-use std::fs::OpenOptions;
 use std::io::{self, Write};
 
 use crate::error_print;
@@ -20,7 +19,20 @@ fn get_ipc_path() -> &'static str {
     "/proc/self/fd/3"
 }
 
-pub fn write_message_for_ipc(message: IpcMessage) -> io::Result<()> {
+/// Windows 不支持 /dev/fd/3 或 /proc/self/fd/3，使用 stdout 作为 IPC 通道的回退方案
+#[cfg(target_os = "windows")]
+fn write_message_for_ipc(message: IpcMessage) -> io::Result<()> {
+    let message = serde_json::to_string(&message)?;
+    let mut stdout = io::stdout().lock();
+    writeln!(stdout, "{}", message)?;
+    stdout.flush()?;
+    Ok(())
+}
+
+/// Unix 系统（macOS/Linux）通过 fd3 文件描述符进行 IPC 通信
+#[cfg(not(target_os = "windows"))]
+fn write_message_for_ipc(message: IpcMessage) -> io::Result<()> {
+    use std::fs::OpenOptions;
     let message = serde_json::to_string(&message)?;
     let mut file = OpenOptions::new().write(true).open(get_ipc_path())?;
     writeln!(file, "{}", message)?;
@@ -62,6 +74,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))]
     fn test_get_ipc_path() {
         let path = get_ipc_path();
         assert!(!path.is_empty());

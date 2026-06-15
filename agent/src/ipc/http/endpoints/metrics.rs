@@ -39,7 +39,7 @@ struct MetricsResponse {
     data: Option<ProcessMetrics>,
 }
 
-async fn get_metrics(Path(pid): Path<u16>) -> ResponseJson<MetricsResponse> {
+async fn get_metrics(Path(pid): Path<u32>) -> ResponseJson<MetricsResponse> {
     log_print!("/metrics/{}", pid);
     let metrics = PROCESS_MAP_STORE.get_metrics(&pid);
     ResponseJson(MetricsResponse {
@@ -70,7 +70,7 @@ pub const METRICS_PUSH_ROUTER: MetricsPushRouter = MetricsPushRouter {
 
 #[derive(Deserialize)]
 struct PushMetricsRequest {
-    pid: u16,
+    pid: u32,
     subject: String,
     data: serde_json::Value,
 }
