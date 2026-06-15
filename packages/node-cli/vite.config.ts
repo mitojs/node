@@ -16,7 +16,6 @@ const outputOptions = {
 	banner,
 	footer,
 	exports: 'named' as const,
-	codeSplitting: false,
 }
 
 const configs = {
@@ -28,6 +27,7 @@ const configs = {
 		emptyOutDir: true,
 		target: 'es2022',
 		entryFileNames: 'index.esm.js',
+		codeSplitting: false,
 		plugins: [
 			dts({
 				tsconfigPath: resolve(baseDir, 'tsconfig.json'),
@@ -45,16 +45,29 @@ const configs = {
 		emptyOutDir: false,
 		target: 'es2015',
 		entryFileNames: 'index.cjs',
+		codeSplitting: false,
 		plugins: [],
 	},
 	bin: {
 		entry: resolve(baseDir, 'src/bin.ts'),
 		formats: ['es'] as LibraryFormats[],
 		fileName: () => 'cli.mjs',
-		external: [] as string[],
+		external: ['./interactive-cli.mjs'],
 		emptyOutDir: false,
 		target: 'es2022',
 		entryFileNames: 'cli.mjs',
+		codeSplitting: false,
+		plugins: [],
+	},
+	interactive: {
+		entry: resolve(baseDir, 'src/interactive-cli.tsx'),
+		formats: ['es'] as LibraryFormats[],
+		fileName: () => 'interactive-cli.mjs',
+		external: [] as string[],
+		emptyOutDir: false,
+		target: 'es2022',
+		entryFileNames: 'interactive-cli.mjs',
+		codeSplitting: false,
 		plugins: [],
 	},
 }
@@ -78,6 +91,7 @@ export default defineConfig({
 			output: {
 				...outputOptions,
 				entryFileNames: current.entryFileNames,
+				codeSplitting: current.codeSplitting,
 			},
 			external: current.external,
 		},

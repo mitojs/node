@@ -19,6 +19,15 @@ program
 	.option('-p, --pid <pid>', 'process id of the target process')
 	.option('--port <port>', 'inspector port of the target process', '9229')
 	.option('--json', 'output in JSON format for programmatic consumption', false)
+	.option('-i, --interactive', 'enter interactive TUI mode', false)
+	.action(() => {
+		if (program.opts().interactive) {
+			// @ts-expect-error 独立打包产物，运行时由 cli.mjs 同目录的 interactive-cli.mjs 提供
+			import('./interactive-cli.mjs')
+		} else {
+			program.help()
+		}
+	})
 
 for (const plugin of registry.getAll()) {
 	const command = program.command(plugin.name).description(plugin.description)
@@ -97,10 +106,3 @@ for (const plugin of registry.getAll()) {
 }
 
 program.parse(process.argv)
-
-// 无子命令时自动进入 TUI 交互模式
-const userArgs = process.argv.slice(2)
-const hasSubcommand = registry.getAll().some((p) => userArgs.includes(p.name))
-if (!userArgs.length || (!hasSubcommand && !userArgs.includes('--help') && !userArgs.includes('-h'))) {
-	import('./interactive-cli.js')
-}

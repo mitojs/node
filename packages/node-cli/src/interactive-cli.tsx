@@ -305,6 +305,4 @@ function InteractiveCLI() {
 	return null
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-	render(<InteractiveCLI />)
-}
+render(<InteractiveCLI />)

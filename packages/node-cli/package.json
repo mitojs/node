@@ -27,11 +27,12 @@
 		"dist"
 	],
 	"scripts": {
-		"build": "run-s vite-build:esm vite-build:cjs vite-build:bin",
+		"build": "run-s vite-build:esm vite-build:cjs vite-build:bin vite-build:interactive",
 		"watch": "BUILD_TARGET=bin vite build --watch",
 		"vite-build:esm": "BUILD_TARGET=esm vite build",
 		"vite-build:cjs": "BUILD_TARGET=cjs vite build",
 		"vite-build:bin": "BUILD_TARGET=bin vite build",
+		"vite-build:interactive": "BUILD_TARGET=interactive vite build",
 		"lint": "eslint ./src/**",
 		"test": "vitest run"
 	},
