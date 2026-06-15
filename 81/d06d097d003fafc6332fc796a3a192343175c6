@@ -1,0 +1,66 @@
+packages/node/src/proxy_thread/index.ts
+  s_0c14abd819efdd::t_146dd148dec450 7-8 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a2f7834dd75e5b8da9ab3e0","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[7,8]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "81d06d097d003fafc6332fc796a3a192343175c6",
+  "prompts": {},
+  "sessions": {
+    "s_0c14abd819efdd": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a2f7817dd75e5b8da9ab3d0",
+        "model": "c_o_new_thinking-opt__max"
+      },
+      "human_author": "陈金伙 <chenjinhuo@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {
+    "packages/node/src/proxy_thread/index.ts": [
+      {
+        "hash": "s_0c14abd819efdd::t_146dd148dec450",
+        "line_ranges": [
+          {
+            "Range": [
+              7,
+              8
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a2f7834dd75e5b8da9ab3e0",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  7,
+                  8
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "s_0c14abd819efdd": {
+      "tool": "trae",
+      "conversation_id": "6a2f7817dd75e5b8da9ab3d0",
+      "session_id": "6a2f7817dd75e5b8da9ab3d0",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "s_0c14abd819efdd::t_146dd148dec450": {
+      "tool": "trae",
+      "conversation_id": "6a2f7817dd75e5b8da9ab3d0",
+      "session_id": "6a2f7817dd75e5b8da9ab3d0",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
