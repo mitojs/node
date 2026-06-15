@@ -10,12 +10,11 @@
 	],
 	"scripts": {
 		"commit": "git add . && git czg",
-		"esm": "pnpm --parallel esm",
-		"watch:esm": "pnpm --parallel --stream watch:esm",
 		"build:rust": "cd ./agent && ./build.sh",
 		"build": "pnpm --parallel build && pnpm run build:rust",
 		"test": "pnpm --parallel test",
 		"web:dev": "pnpm --filter @mono/react-19 dev",
+		"watch:cli": "pnpm --filter @mitojs/node-cli vite-build:esm -- --watch",
 		"clean": "shx rm -rf packages/**/*.tsbuildinfo && shx rm -rf ./{packages,app}/*/{esm,dist}",
 		"clean:node_module": "rm -rf ./node_modules && rm -rf ./{packages,app,e2e}/**/node_modules",
 		"postinstall": "husky install",
@@ -31,13 +30,6 @@
 		"@changesets/cli": "^2.29.5",
 		"@commitlint/config-conventional": "^19.2.2",
 		"@mono/tsconfig": "workspace:^",
-		"@rollup/plugin-alias": "^5.1.0",
-		"@rollup/plugin-commonjs": "^26.0.1",
-		"@rollup/plugin-html": "^1.0.3",
-		"@rollup/plugin-json": "^6.1.0",
-		"@rollup/plugin-node-resolve": "^15.2.3",
-		"@rollup/plugin-strip": "^3.0.4",
-		"@rollup/plugin-typescript": "^11.1.6",
 		"@types/debug": "^4.1.12",
 		"@types/jest": "^29.5.12",
 		"@types/node": "^22.1.0",
@@ -51,22 +43,14 @@
 		"lint-staged": "^15.2.8",
 		"npm-run-all": "^4.1.5",
 		"nx": "^21.2.1",
-		"rollup": "^4.44.1",
-		"rollup-plugin-cleanup": "^3.2.1",
-		"rollup-plugin-clear": "^2.0.7",
-		"rollup-plugin-sizes": "^1.0.6",
-		"rollup-plugin-terser": "^7.0.2",
-		"rollup-plugin-visualizer": "^5.12.0",
 		"shx": "^0.4.0",
 		"ts-jest": "^29.2.4",
 		"tslib": "^2.6.3",
 		"typescript": "^5.8.3"
 	},
 	"dependencies": {
-		"@rollup/plugin-babel": "^6.0.3",
 		"cac": "^6.7.14",
 		"execa": "^6.1.0",
-		"minimist": "^1.2.8",
-		"rollup-plugin-dts": "^5.3.0"
+		"minimist": "^1.2.8"
 	}
 }

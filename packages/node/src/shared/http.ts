@@ -16,6 +16,8 @@ export interface HttpServerOptions {
 	exclusive?: boolean
 	/** 主机地址，默认为 '0.0.0.0' */
 	host?: string
+	/** 请求处理函数 */
+	onRequest?: (req: http.IncomingMessage, res: http.ServerResponse) => void
 }
 
 /**
@@ -27,7 +29,7 @@ export async function createHttpServer(options: number | HttpServerOptions): Pro
 	// 处理兼容性：如果参数是数字，则将其转换为对象
 	const config: HttpServerOptions = typeof options === 'number' ? { port: options } : options
 
-	const { port, retryCount = 5, retryDelay = 1000, exclusive = true, host = '0.0.0.0' } = config
+	const { port, retryCount = 5, retryDelay = 1000, exclusive = true, host = '0.0.0.0', onRequest } = config
 
 	let currentPort = port
 
@@ -64,14 +66,10 @@ export async function createHttpServer(options: number | HttpServerOptions): Pro
 							logger.info(`HTTP 服务器已关闭 (${host}:${currentPort})`)
 						})
 
-						// TODO: 处理 agent 下发的请求
-						// server.on('request', (req, res) => {
-						// 	logger.info('收到请求', req.url)
-						// })
-
-						// server.on('upgrade', (req, socket, head) => {
-						// 	logger.info('升级连接请求', req.url)
-						// })
+						// 注册请求处理
+						if (onRequest) {
+							server.on('request', onRequest)
+						}
 
 						resolve(server)
 					}

@@ -3,3 +3,6 @@ pub mod constants;
 pub mod error;
 pub mod metrics;
 pub mod path;
+
+#[cfg(test)]
+mod tests;

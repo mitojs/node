@@ -2,7 +2,7 @@
 #[macro_export]
 macro_rules! log_print {
     ($($arg:tt)*) => {
-        println!("[Agent] {}", format!($($arg)*));
+        println!("[Agent] {}", format!($($arg)*))
     };
 }
 
@@ -10,7 +10,7 @@ macro_rules! log_print {
 #[macro_export]
 macro_rules! debug_print {
     ($($arg:tt)*) => {
-        println!("[Agent] DEBUG: {}", format!($($arg)*));
+        println!("[Agent] DEBUG: {}", format!($($arg)*))
     };
 }
 
@@ -18,6 +18,6 @@ macro_rules! debug_print {
 #[macro_export]
 macro_rules! error_print {
     ($($arg:tt)*) => {
-        eprintln!("[Agent] ERROR: {}", format!($($arg)*));
+        eprintln!("[Agent] ERROR: {}", format!($($arg)*))
     };
 }

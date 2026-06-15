@@ -5,26 +5,33 @@ import type React from 'react'
 import { useEffect, useState } from 'react'
 
 interface CPUGraphProps {
-	pid: number
+	getCPUData: () => Promise<number>
 }
 
-// 采集CPU数据的函数（实际建议用pidusage等库，这里用Math.random演示）
-function getCPUPercent(pid: number): number {
-	return Math.random() * 100
-}
-
-const CPUGraph: React.FC<CPUGraphProps> = ({ pid }) => {
+const CPUGraph: React.FC<CPUGraphProps> = ({ getCPUData }) => {
 	const [data, setData] = useState<number[]>([])
 	useEffect(() => {
-		const interval = setInterval(() => {
-			setData((prev) => {
-				const next = [...prev, getCPUPercent(pid)]
-				if (next.length > 50) next.shift()
-				return next
-			})
-		}, 500)
-		return () => clearInterval(interval)
-	}, [pid])
+		let active = true
+		const poll = async () => {
+			while (active) {
+				try {
+					const cpuPercent = await getCPUData()
+					setData((prev) => {
+						const next = [...prev, cpuPercent]
+						if (next.length > 50) next.shift()
+						return next
+					})
+				} catch {
+					break
+				}
+				await new Promise((r) => setTimeout(r, 1000))
+			}
+		}
+		poll()
+		return () => {
+			active = false
+		}
+	}, [getCPUData])
 	const max = 100
 	return (
 		<Box flexDirection='column'>

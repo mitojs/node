@@ -1,0 +1,816 @@
+{
+  "version": "2.13",
+  "children": [
+    {
+      "type": "frame",
+      "id": "unaop",
+      "x": 0,
+      "y": 0,
+      "name": "Terminal Monitor App",
+      "clip": true,
+      "width": 800,
+      "height": 600,
+      "fill": "$surface-terminal",
+      "layout": "vertical",
+      "gap": 10,
+      "padding": 18,
+      "children": [
+        {
+          "type": "frame",
+          "id": "UBJ4f",
+          "name": "Terminal Native TUI",
+          "clip": true,
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#030507",
+          "cornerRadius": 8,
+          "stroke": "$border-subtle",
+          "strokeWidth": 1,
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#000000B3",
+            "offset": {
+              "x": 0,
+              "y": 12
+            },
+            "blur": 24
+          },
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 14,
+          "children": [
+            {
+              "type": "frame",
+              "id": "k3yg3",
+              "name": "Shell Command Row",
+              "width": "fill_container",
+              "height": 18,
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "bXnrF",
+                  "name": "Prompt User",
+                  "fill": "$accent-green",
+                  "content": "prod-01",
+                  "fontFamily": "$font-data",
+                  "fontSize": 12,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "gvR1W",
+                  "name": "Prompt Path",
+                  "fill": "$accent-cyan",
+                  "content": "~/services/api",
+                  "fontFamily": "$font-data",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "ZNZsG",
+                  "name": "Prompt Command",
+                  "fill": "$foreground-primary",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "$ termpulse watch --profile prod --interval 250ms",
+                  "fontFamily": "$font-data",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "h3IHOC",
+                  "name": "Prompt Status",
+                  "fill": "$accent-primary",
+                  "content": "LIVE",
+                  "fontFamily": "$font-data",
+                  "fontSize": 12,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "U4H9Sl",
+              "name": "TUI Body",
+              "width": "fill_container",
+              "height": "fill_container",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "m5Wpw",
+                  "name": "Metrics And Curves Pane",
+                  "width": 500,
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "hPaYs",
+                      "name": "TUI Header Box",
+                      "width": "fill_container",
+                      "height": 60,
+                      "fill": "#060A0D",
+                      "stroke": "$border-subtle",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 3,
+                      "padding": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "J68nQ",
+                          "name": "Header Line 1",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "┌ TermPulse / terminal metrics ─────────────────────┐",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "q41GPA",
+                          "name": "Header Line 2",
+                          "fill": "$foreground-primary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "│ host prod-01 | svc api-worker | 250ms | curves     │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "okHrV",
+                          "name": "Header Line 3",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "└───────────────────────────────────────────────────┘",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "GV6C4",
+                      "name": "Metric Values Row",
+                      "width": "fill_container",
+                      "height": 54,
+                      "gap": 8,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "G0egPP",
+                          "name": "CPU Terminal Metric",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "fill": "#080D12",
+                          "stroke": "$border-subtle",
+                          "strokeWidth": 1,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "padding": [
+                            6,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Hoc3a",
+                              "name": "CPU Key",
+                              "fill": "$foreground-muted",
+                              "content": "CPU",
+                              "fontFamily": "$font-data",
+                              "fontSize": 10,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "BuO9U",
+                              "name": "CPU Terminal Value",
+                              "fill": "$accent-primary",
+                              "content": "78%",
+                              "fontFamily": "$font-data",
+                              "fontSize": 18,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "y7kWbC",
+                          "name": "MEM Terminal Metric",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "fill": "#080D12",
+                          "stroke": "$border-subtle",
+                          "strokeWidth": 1,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "padding": [
+                            6,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "xFrfq",
+                              "name": "MEM Key",
+                              "fill": "$foreground-muted",
+                              "content": "MEM",
+                              "fontFamily": "$font-data",
+                              "fontSize": 10,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "jXAAy",
+                              "name": "MEM Terminal Value",
+                              "fill": "$accent-cyan",
+                              "content": "11.4G",
+                              "fontFamily": "$font-data",
+                              "fontSize": 18,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "D3pMoS",
+                          "name": "NET Terminal Metric",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "fill": "#080D12",
+                          "stroke": "$border-subtle",
+                          "strokeWidth": 1,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "padding": [
+                            6,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ejEC8",
+                              "name": "NET Key",
+                              "fill": "$foreground-muted",
+                              "content": "NET",
+                              "fontFamily": "$font-data",
+                              "fontSize": 10,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "wreSm",
+                              "name": "NET Terminal Value",
+                              "fill": "$accent-green",
+                              "content": "842M",
+                              "fontFamily": "$font-data",
+                              "fontSize": 18,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "JcCNR",
+                          "name": "P95 Terminal Metric",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "fill": "#080D12",
+                          "stroke": "$border-subtle",
+                          "strokeWidth": 1,
+                          "layout": "vertical",
+                          "gap": 3,
+                          "padding": [
+                            6,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Zukca",
+                              "name": "P95 Key",
+                              "fill": "$foreground-muted",
+                              "content": "P95",
+                              "fontFamily": "$font-data",
+                              "fontSize": 10,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "NnnXC",
+                              "name": "P95 Terminal Value",
+                              "fill": "$accent-amber",
+                              "content": "186ms",
+                              "fontFamily": "$font-data",
+                              "fontSize": 18,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "HnOZw",
+                      "name": "ASCII Curves Pane",
+                      "width": "fill_container",
+                      "height": 198,
+                      "fill": "#030507",
+                      "stroke": "$border-subtle",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 4,
+                      "padding": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "sljJe",
+                          "name": "Chart Top",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "┌─ curves: cpu/mem/io ──────────────────────────────┐",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "r6SYQZ",
+                          "name": "Chart Axis 1",
+                          "fill": "$accent-primary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "100│ CPU    ╭╮    ╭──╮      ╭╮      ╭──╮        │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "UFGjB",
+                          "name": "Chart Axis 2",
+                          "fill": "$accent-primary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": " 75│     ╭──╯╰╮ ╭╯  ╰╮ ╭─╯╰─╮ ╭╯  ╰╮       │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "HwmKc",
+                          "name": "Chart Axis 3",
+                          "fill": "$accent-cyan",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": " 50│ MEM ─╮  ╰─╯     ╰─╯     ╰──╯     ╰──╮  │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "FIHJH",
+                          "name": "Chart Axis 4",
+                          "fill": "$accent-green",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": " 25│ IO  ╭╯╰╮   ╭╮      ╭╮  ╭──╮     ╭╮ ╰╮ │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "gGzmX",
+                          "name": "Chart Axis 5",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "  0└────┴────┴────┴────┴────┴────┴────┴──┘ t",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "b24l4",
+                          "name": "Chart Legend",
+                          "fill": "$foreground-muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "     cpu:#a855f7  mem:#22d3ee  io:#34d399  60s",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "E4ozsv",
+                      "name": "Terminal Event Stream",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "#060A0D",
+                      "stroke": "$border-subtle",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 4,
+                      "padding": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ORjWe",
+                          "name": "Event [12:04:18] WARN cpu sustained above 75% on api-worker-3",
+                          "fill": "$accent-amber",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "[12:04:18] WARN cpu sustained above 75% on api-worker-3",
+                          "fontFamily": "$font-data",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "A7mdwJ",
+                          "name": "Event [12:04:19] INFO net ingress 842Mbps, packet loss 0.02%",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "[12:04:19] INFO net ingress 842Mbps, packet loss 0.02%",
+                          "fontFamily": "$font-data",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "ktSyG",
+                          "name": "Event [12:04:21] OK   latency p95 back under 200ms baseline",
+                          "fill": "$accent-green",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "[12:04:21] OK   latency p95 back under 200ms baseline",
+                          "fontFamily": "$font-data",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "KIwxh",
+                          "name": "Event [12:04:23] CMD  press 4 to mute alert for 10m",
+                          "fill": "$accent-cyan",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "[12:04:23] CMD  press 4 to mute alert for 10m",
+                          "fontFamily": "$font-data",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "gnYAn",
+                  "name": "Keyboard Options Pane",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "ItzM6",
+                      "name": "Terminal Function Options",
+                      "width": "fill_container",
+                      "height": 270,
+                      "fill": "#060A0D",
+                      "stroke": "$border-subtle",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 5,
+                      "padding": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "nkN1G",
+                          "name": "Options Top",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "┌─ function keys ─────────────┐",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "or9Dz",
+                          "name": "Option [1] toggle cpu/mem curves",
+                          "fill": "$foreground-primary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "│ [1] toggle cpu/mem curves │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "twVnu",
+                          "name": "Option [2] show network throughput",
+                          "fill": "$foreground-primary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "│ [2] show network throughput│",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Oz4rF",
+                          "name": "Option [3] show disk io queue",
+                          "fill": "$foreground-primary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "│ [3] show disk io queue    │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "tiYBt",
+                          "name": "Option [4] mute active alert",
+                          "fill": "$accent-amber",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "│ [4] mute active alert     │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "bUSv8",
+                          "name": "Option [5] process top n",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "│ [5] process top n         │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "nQves",
+                          "name": "Option [6] export snapshot json",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "│ [6] export snapshot json  │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Y1hLr",
+                          "name": "Option [7] switch service",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "│ [7] switch service        │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "SgsGc",
+                          "name": "Option [q] quit monitor",
+                          "fill": "$alert-red",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "│ [q] quit monitor          │",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "PBwpS",
+                          "name": "Options Bottom",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "└─────────────────────────────┘",
+                          "lineHeight": 1,
+                          "fontFamily": "$font-data",
+                          "fontSize": 10,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ih29I",
+                      "name": "Command Help Pane",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "#030507",
+                      "stroke": "$border-subtle",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 5,
+                      "padding": 8,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "L9Ypzm",
+                          "name": "Command Help Title",
+                          "fill": "$accent-primary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "active command",
+                          "fontFamily": "$font-data",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Xw4Ew",
+                          "name": "Command Help 1",
+                          "fill": "$accent-green",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "> tp alert mute --service api --duration 10m",
+                          "fontFamily": "$font-data",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "H5HFE",
+                          "name": "Command Help 2",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "threshold.cpu = 85%",
+                          "fontFamily": "$font-data",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "UpgQP",
+                          "name": "Command Help 3",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "refresh      = 250ms",
+                          "fontFamily": "$font-data",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "HYgtW",
+                          "name": "Command Help 4",
+                          "fill": "$foreground-secondary",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "output       = terminal/tui",
+                          "fontFamily": "$font-data",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "accent-amber": {
+      "type": "color",
+      "value": "#FBBF24"
+    },
+    "accent-cyan": {
+      "type": "color",
+      "value": "#22D3EE"
+    },
+    "accent-green": {
+      "type": "color",
+      "value": "#34D399"
+    },
+    "accent-primary": {
+      "type": "color",
+      "value": "#A855F7"
+    },
+    "accent-secondary": {
+      "type": "color",
+      "value": "#EC4899"
+    },
+    "alert-red": {
+      "type": "color",
+      "value": "#FB7185"
+    },
+    "border-subtle": {
+      "type": "color",
+      "value": "#26262A"
+    },
+    "font-body": {
+      "type": "string",
+      "value": "Geist"
+    },
+    "font-caption": {
+      "type": "string",
+      "value": "Funnel Sans"
+    },
+    "font-data": {
+      "type": "string",
+      "value": "Geist Mono"
+    },
+    "font-heading": {
+      "type": "string",
+      "value": "Inter"
+    },
+    "foreground-inverse": {
+      "type": "color",
+      "value": "#0A0A0A"
+    },
+    "foreground-muted": {
+      "type": "color",
+      "value": "#71717A"
+    },
+    "foreground-primary": {
+      "type": "color",
+      "value": "#FFFFFF"
+    },
+    "foreground-secondary": {
+      "type": "color",
+      "value": "#A1A1AA"
+    },
+    "surface-elevated": {
+      "type": "color",
+      "value": "#111113"
+    },
+    "surface-panel": {
+      "type": "color",
+      "value": "#17171A"
+    },
+    "surface-primary": {
+      "type": "color",
+      "value": "#0A0A0A"
+    },
+    "surface-terminal": {
+      "type": "color",
+      "value": "#050608"
+    }
+  }
+}
