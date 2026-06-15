@@ -1,27 +1,28 @@
+import { describe, expect, it, vi } from 'vitest'
 import type { DiagnosticContext } from '../../core/types'
 import { timersPlugin } from '../../plugins/timers'
 import type { AgentClient, MetricsData } from '../../services/agent-client'
 import type { InspectorSession } from '../../services/inspector-session'
 
-jest.mock('../../helper', () => ({
-	FUNCTION_WRAPPER: jest.fn((code: string) => `wrapped(${code})`),
+vi.mock('../../helper', () => ({
+	FUNCTION_WRAPPER: vi.fn((code: string) => `wrapped(${code})`),
 }))
 
 function createMockSession(evaluateResult: any): InspectorSession {
 	return {
-		evaluate: jest.fn().mockResolvedValue(evaluateResult),
-		sendMessage: jest.fn(),
-		open: jest.fn(),
-		connect: jest.fn(),
-		close: jest.fn(),
-		closeInspector: jest.fn(),
+		evaluate: vi.fn().mockResolvedValue(evaluateResult),
+		sendMessage: vi.fn(),
+		open: vi.fn(),
+		connect: vi.fn(),
+		close: vi.fn(),
+		closeInspector: vi.fn(),
 	} as any
 }
 
 function createMockAgentClient(metrics: MetricsData | null): AgentClient {
 	return {
-		isAvailable: jest.fn().mockResolvedValue(true),
-		getMetrics: jest.fn().mockResolvedValue(metrics),
+		isAvailable: vi.fn().mockResolvedValue(true),
+		getMetrics: vi.fn().mockResolvedValue(metrics),
 	} as any
 }
 
@@ -31,7 +32,7 @@ function createContext(overrides: Partial<DiagnosticContext> = {}): DiagnosticCo
 		port: 9229,
 		json: false,
 		session: createMockSession(null),
-		output: jest.fn(),
+		output: vi.fn(),
 		...overrides,
 	}
 }

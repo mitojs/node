@@ -1,8 +1,9 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TimeoutCollector } from '../../collector/timeout'
 
 describe('TimeoutCollector', () => {
 	afterEach(() => {
-		jest.clearAllMocks()
+		vi.clearAllMocks()
 	})
 	describe('init And destroy', () => {
 		// 验证创建实例对象时，是否有劫持setTimeout和setInterval

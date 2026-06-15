@@ -16,6 +16,14 @@ export function genFilename(ext: string): string {
 	return `${tmpdirPath}/${uuidv4()}.${ext}`
 }
 
+export function safeCallSync<T>(fn: (...args: any[]) => T, ...args: any[]): T | undefined {
+	try {
+		return fn(...args)
+	} catch {
+		return undefined
+	}
+}
+
 export const FUNCTION_WRAPPER = (code: string) => `(async function() {
         try {
             const data = await (async function() {

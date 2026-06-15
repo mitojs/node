@@ -1,18 +1,20 @@
+import type { MockInstance } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createOutputFormatter } from '../../services/output-formatter'
 
 describe('createOutputFormatter', () => {
-	let stdoutWriteSpy: jest.SpyInstance
-	let consoleLogSpy: jest.SpyInstance
-	let consoleErrorSpy: jest.SpyInstance
+	let stdoutWriteSpy: MockInstance
+	let consoleLogSpy: MockInstance
+	let consoleErrorSpy: MockInstance
 
 	beforeEach(() => {
-		stdoutWriteSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => true)
-		consoleLogSpy = jest.spyOn(console, 'log').mockImplementation()
-		consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation()
+		stdoutWriteSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+		consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 	})
 
 	afterEach(() => {
-		jest.restoreAllMocks()
+		vi.restoreAllMocks()
 	})
 
 	describe('JSON mode (json=true)', () => {

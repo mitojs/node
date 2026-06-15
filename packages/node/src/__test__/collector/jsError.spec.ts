@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { JsErrorCollector } from '../../collector/js-error'
 
 describe('JSErrorCollector', () => {
@@ -14,12 +15,12 @@ describe('JSErrorCollector', () => {
 	describe('subscribe', () => {
 		// 验证 subscribe() 同时支持单个回调和回调数组的注册
 		it('should support subscribing with an array of callbacks or a single callback', () => {
-			const subscriber1 = jest.fn()
+			const subscriber1 = vi.fn()
 			collector.subscribe(subscriber1)
 			expect(collector['_subscribers']).toContain(subscriber1)
 			expect(collector['_subscribers']).toHaveLength(1)
 
-			const subscriber2 = jest.fn()
+			const subscriber2 = vi.fn()
 			collector.subscribe([subscriber1, subscriber2])
 			expect(collector['_subscribers']).toContain(subscriber1)
 			expect(collector['_subscribers']).toContain(subscriber2)
@@ -35,7 +36,7 @@ describe('JSErrorCollector', () => {
 
 		// 验证 uncaughtException 触发时，订阅者会收到对应错误
 		it('should call subscribers when uncaughtException occurs', () => {
-			const subscriber = jest.fn()
+			const subscriber = vi.fn()
 			collector.subscribe(subscriber)
 			const error = new Error('Test error')
 
@@ -47,8 +48,8 @@ describe('JSErrorCollector', () => {
 
 		// 验证存在多个订阅者时，所有订阅者都会收到错误通知
 		it('should call all subscribers when error occurs', () => {
-			const subscriber1 = jest.fn()
-			const subscriber2 = jest.fn()
+			const subscriber1 = vi.fn()
+			const subscriber2 = vi.fn()
 			collector.subscribe([subscriber1, subscriber2])
 			const error = new Error('Test error')
 
@@ -62,7 +63,7 @@ describe('JSErrorCollector', () => {
 	describe('destroy', () => {
 		// 验证 destroy() 会清空订阅者与 teardown(清理函数)，并移除事件监听器
 		it('should clear subscribers and teardown functions(remove event listeners)', () => {
-			const subscriber = jest.fn()
+			const subscriber = vi.fn()
 			collector.subscribe(subscriber)
 			const error = new Error('Test error')
 			process.emit('uncaughtException', error)
@@ -74,7 +75,12 @@ describe('JSErrorCollector', () => {
 			subscriber.mockClear()
 			// destroy 后，监听器应该被移除
 			collector.destroy()
+
+			// 添加临时监听器防止 Vitest 捕获 uncaughtException
+			const noop = () => {}
+			process.on('uncaughtException', noop)
 			process.emit('uncaughtException', error)
+			process.off('uncaughtException', noop)
 
 			expect(collector['_subscribers']).toHaveLength(0)
 			expect(collector['_teardown']).toHaveLength(0)

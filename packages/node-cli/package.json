@@ -33,7 +33,7 @@
 		"vite-build:cjs": "BUILD_TARGET=cjs vite build",
 		"vite-build:bin": "BUILD_TARGET=bin vite build",
 		"lint": "eslint ./src/**",
-		"test": "jest --config jest.config.cjs"
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@types/ink": "2.0.3",
@@ -48,6 +48,7 @@
 		"@mono/tsconfig": "workspace:*",
 		"@types/ws": "^8.18.1",
 		"vite": "^8.0.0",
-		"vite-plugin-dts": "^4.0.0"
+		"vite-plugin-dts": "^4.0.0",
+		"vitest": "^4.1.8"
 	}
 }

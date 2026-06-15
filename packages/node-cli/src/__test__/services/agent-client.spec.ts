@@ -1,4 +1,5 @@
 import * as http from 'node:http'
+import { afterEach, describe, expect, it } from 'vitest'
 import { AgentClient } from '../../services/agent-client'
 
 let mockServer: http.Server | null = null

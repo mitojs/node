@@ -1,3 +1,4 @@
+import { describe, expect, it, vi } from 'vitest'
 import type { DiagnosticContext } from '../../core/types'
 import { memoryPlugin } from '../../plugins/memory'
 import type { AgentClient, MetricsData } from '../../services/agent-client'
@@ -5,19 +6,19 @@ import type { InspectorSession } from '../../services/inspector-session'
 
 function createMockSession(evaluateResult: any): InspectorSession {
 	return {
-		evaluate: jest.fn().mockResolvedValue(evaluateResult),
-		sendMessage: jest.fn(),
-		open: jest.fn(),
-		connect: jest.fn(),
-		close: jest.fn(),
-		closeInspector: jest.fn(),
+		evaluate: vi.fn().mockResolvedValue(evaluateResult),
+		sendMessage: vi.fn(),
+		open: vi.fn(),
+		connect: vi.fn(),
+		close: vi.fn(),
+		closeInspector: vi.fn(),
 	} as any
 }
 
 function createMockAgentClient(metrics: MetricsData | null): AgentClient {
 	return {
-		isAvailable: jest.fn().mockResolvedValue(true),
-		getMetrics: jest.fn().mockResolvedValue(metrics),
+		isAvailable: vi.fn().mockResolvedValue(true),
+		getMetrics: vi.fn().mockResolvedValue(metrics),
 	} as any
 }
 
@@ -27,7 +28,7 @@ function createContext(overrides: Partial<DiagnosticContext> = {}): DiagnosticCo
 		port: 9229,
 		json: false,
 		session: createMockSession({ rss: 50000000, heapTotal: 20000000 }),
-		output: jest.fn(),
+		output: vi.fn(),
 		...overrides,
 	}
 }
