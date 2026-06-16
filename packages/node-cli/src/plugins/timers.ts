@@ -1,5 +1,5 @@
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { FUNCTION_WRAPPER } from '../helper.js'
+import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
 
 export const timersPlugin: DiagnosticPlugin = {
 	name: 'timers',
@@ -14,7 +14,8 @@ export const timersPlugin: DiagnosticPlugin = {
 		}
 
 		// 回退到 Inspector 注入：检测 SDK 是否加载并读取内部数据
-		const data = await ctx.session.evaluate(
+		const session = await ensureSession(ctx)
+		const data = await session.evaluate(
 			FUNCTION_WRAPPER(`
 				if (globalThis.__MITO_NODE_ACTIVE__) {
 					// SDK 已加载但 Agent 不可用时，尝试从全局获取定时器数据

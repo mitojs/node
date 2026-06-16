@@ -8,6 +8,11 @@ export interface MetricsData {
 	last_updated?: number
 }
 
+export interface ProcessInfo {
+	metrics: MetricsData | null
+	registeredSubjects: string[]
+}
+
 export class AgentClient {
 	private baseUrls: string[]
 
@@ -34,6 +39,19 @@ export class AgentClient {
 			const res = await this.fetch(`/metrics/${pid}`)
 			if (res && res.success && res.data) {
 				return res.data as MetricsData
+			}
+		} catch {}
+		return null
+	}
+
+	async getProcessInfo(pid: number): Promise<ProcessInfo | null> {
+		try {
+			const res = await this.fetch(`/metrics/${pid}`)
+			if (res && res.success) {
+				return {
+					metrics: res.data ?? null,
+					registeredSubjects: res.registered_subjects ?? [],
+				}
 			}
 		} catch {}
 		return null

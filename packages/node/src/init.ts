@@ -100,11 +100,12 @@ export async function initProxyThread() {
 /**
  * 同步当前进程信息到 agent，并拉取 agent 监听的 uds 路径
  */
-export async function SyncToAgent() {
+export async function SyncToAgent(enabledSubjects: string[]) {
 	try {
 		await registerProcessToAgent({
 			pid: process.pid,
 			udsPath: '',
+			subjects: enabledSubjects,
 		})
 		logger.info('process registered to agent')
 	} catch (e) {

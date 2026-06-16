@@ -2,7 +2,7 @@ import { render } from 'ink'
 import React from 'react'
 import CPUGraph from '../CPUGraph.js'
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { FUNCTION_WRAPPER } from '../helper.js'
+import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
 
 export const monitorCpuPlugin: DiagnosticPlugin = {
 	name: 'monitor-cpu',
@@ -11,7 +11,8 @@ export const monitorCpuPlugin: DiagnosticPlugin = {
 		let lastCpuData: { user: number; system: number; hrtime: bigint } | null = null
 
 		const getCPUDataFromInspector = async (): Promise<number> => {
-			const data = await ctx.session.evaluate(
+			const session = await ensureSession(ctx)
+			const data = await session.evaluate(
 				FUNCTION_WRAPPER(`
 					const usage = process.cpuUsage();
 					const hrtime = process.hrtime.bigint();

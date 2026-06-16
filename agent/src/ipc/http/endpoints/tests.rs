@@ -77,6 +77,7 @@ async fn test_update_process_start() {
             uds_port: 0,
             latest_heartbeat_time: 0,
             metrics: ProcessMetrics::new(),
+            registered_subjects: Vec::new(),
         },
     );
     let json = post_update_process("start").await;
@@ -94,6 +95,7 @@ async fn test_update_process_stop() {
             uds_port: 0,
             latest_heartbeat_time: 0,
             metrics: ProcessMetrics::new(),
+            registered_subjects: Vec::new(),
         },
     );
     let json = post_update_process("stop").await;
@@ -126,6 +128,7 @@ async fn test_heartbeat_updates_store() {
             uds_port: 0,
             latest_heartbeat_time: 0,
             metrics: ProcessMetrics::new(),
+            registered_subjects: Vec::new(),
         },
     );
 

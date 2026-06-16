@@ -14,6 +14,7 @@ fn make_store_entry(uds_port: u16, heartbeat: u64) -> ProcessStore {
         uds_port,
         latest_heartbeat_time: heartbeat,
         metrics: ProcessMetrics::new(),
+        registered_subjects: Vec::new(),
     }
 }
 

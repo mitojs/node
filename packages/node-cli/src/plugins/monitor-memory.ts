@@ -1,7 +1,7 @@
 import { render } from 'ink'
 import React from 'react'
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { FUNCTION_WRAPPER } from '../helper.js'
+import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
 import MemoryGraph from '../MemoryGraph.js'
 
 export const monitorMemoryPlugin: DiagnosticPlugin = {
@@ -9,7 +9,8 @@ export const monitorMemoryPlugin: DiagnosticPlugin = {
 	description: 'Real-time monitor memory usage of the target process',
 	async execute(ctx) {
 		const getMemoryDataFromInspector = async () => {
-			const data = await ctx.session.evaluate(
+			const session = await ensureSession(ctx)
+			const data = await session.evaluate(
 				FUNCTION_WRAPPER(`
 					const mem = process.memoryUsage();
 					return { heapUsed: mem.heapUsed, heapTotal: mem.heapTotal, rss: mem.rss };
