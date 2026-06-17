@@ -1,11 +1,12 @@
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { FUNCTION_WRAPPER } from '../helper.js'
+import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
 
 export const startInspectPlugin: DiagnosticPlugin = {
 	name: 'start-inspect',
 	description: 'start inspect the target process',
 	async execute(ctx) {
-		const { url } = await ctx.session.evaluate(
+		const session = await ensureSession(ctx)
+		const { url } = await session.evaluate(
 			FUNCTION_WRAPPER(`
 				const { url } = require('inspector');
 				return { url: url() };

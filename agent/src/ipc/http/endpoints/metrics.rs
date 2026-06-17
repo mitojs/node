@@ -37,14 +37,17 @@ pub const METRICS_ROUTER: MetricsRouter = MetricsRouter {
 struct MetricsResponse {
     success: bool,
     data: Option<ProcessMetrics>,
+    registered_subjects: Vec<String>,
 }
 
 async fn get_metrics(Path(pid): Path<u32>) -> ResponseJson<MetricsResponse> {
     log_print!("/metrics/{}", pid);
-    let metrics = PROCESS_MAP_STORE.get_metrics(&pid);
+    let data = PROCESS_MAP_STORE.get_data();
+    let store = data.get(&pid);
     ResponseJson(MetricsResponse {
-        success: metrics.is_some(),
-        data: metrics,
+        success: store.is_some(),
+        data: store.map(|s| s.metrics.clone()),
+        registered_subjects: store.map(|s| s.registered_subjects.clone()).unwrap_or_default(),
     })
 }
 

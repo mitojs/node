@@ -1,6 +1,6 @@
 import * as fs from 'node:fs'
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { FUNCTION_WRAPPER } from '../helper.js'
+import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
 
 export const runCodePlugin: DiagnosticPlugin = {
 	name: 'run-code',
@@ -17,7 +17,8 @@ export const runCodePlugin: DiagnosticPlugin = {
 		if (!code) {
 			return { success: false, error: 'No code or file provided' }
 		}
-		const result = await ctx.session.evaluate(FUNCTION_WRAPPER(code))
+		const session = await ensureSession(ctx)
+		const result = await session.evaluate(FUNCTION_WRAPPER(code))
 		return { success: true, data: result }
 	},
 }

@@ -1,29 +1,30 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DiagnosticContext } from '../../core/types'
 import { cpuProfilePlugin } from '../../plugins/cpu-profile'
 import type { InspectorSession } from '../../services/inspector-session'
 
-jest.mock('node:fs', () => ({
-	writeFileSync: jest.fn(),
+vi.mock('node:fs', () => ({
+	writeFileSync: vi.fn(),
 }))
 
-jest.mock('../../helper', () => ({
-	genFilename: jest.fn().mockReturnValue('/tmp/test-uuid.cpuprofile'),
-	FUNCTION_WRAPPER: jest.fn((code: string) => code),
+vi.mock('../../helper', () => ({
+	genFilename: vi.fn().mockReturnValue('/tmp/test-uuid.cpuprofile'),
+	FUNCTION_WRAPPER: vi.fn((code: string) => code),
 }))
 
 function createMockSession(profileData: any): InspectorSession {
 	return {
-		evaluate: jest.fn(),
-		sendMessage: jest.fn().mockImplementation((method: string) => {
+		evaluate: vi.fn(),
+		sendMessage: vi.fn().mockImplementation((method: string) => {
 			if (method === 'Profiler.stop') {
 				return Promise.resolve({ profile: profileData })
 			}
 			return Promise.resolve({})
 		}),
-		open: jest.fn(),
-		connect: jest.fn(),
-		close: jest.fn(),
-		closeInspector: jest.fn(),
+		open: vi.fn(),
+		connect: vi.fn(),
+		close: vi.fn(),
+		closeInspector: vi.fn(),
 	} as any
 }
 
@@ -33,19 +34,19 @@ function createContext(overrides: Partial<DiagnosticContext> = {}): DiagnosticCo
 		port: 9229,
 		json: false,
 		session: createMockSession({ nodes: [], startTime: 0, endTime: 1000 }),
-		output: jest.fn(),
+		output: vi.fn(),
 		...overrides,
 	}
 }
 
 describe('cpuProfilePlugin', () => {
 	beforeEach(() => {
-		jest.useFakeTimers()
+		vi.useFakeTimers()
 	})
 
 	afterEach(() => {
-		jest.useRealTimers()
-		jest.restoreAllMocks()
+		vi.useRealTimers()
+		vi.restoreAllMocks()
 	})
 
 	it('should have correct metadata', () => {
@@ -72,7 +73,7 @@ describe('cpuProfilePlugin', () => {
 		// Profiler.stop 还不应被调用
 		expect(ctx.session.sendMessage).not.toHaveBeenCalledWith('Profiler.stop')
 
-		jest.advanceTimersByTime(5000)
+		vi.advanceTimersByTime(5000)
 		const result = await resultPromise
 
 		expect(ctx.session.sendMessage).toHaveBeenCalledWith('Profiler.stop')
@@ -85,11 +86,11 @@ describe('cpuProfilePlugin', () => {
 		const resultPromise = cpuProfilePlugin.execute(ctx, {})
 
 		// 5 秒后不该结束
-		jest.advanceTimersByTime(5000)
+		vi.advanceTimersByTime(5000)
 		expect(ctx.session.sendMessage).not.toHaveBeenCalledWith('Profiler.stop')
 
 		// 再推进 5 秒（总计 10 秒）才结束
-		jest.advanceTimersByTime(5000)
+		vi.advanceTimersByTime(5000)
 		const result = await resultPromise
 
 		expect(ctx.session.sendMessage).toHaveBeenCalledWith('Profiler.stop')
@@ -97,13 +98,13 @@ describe('cpuProfilePlugin', () => {
 	})
 
 	it('should write profile data to file via fs.writeFileSync', async () => {
-		const fs = require('node:fs')
+		const fs = await import('node:fs')
 		const profileData = { nodes: [{ id: 1 }], startTime: 0, endTime: 5000 }
 		const session = createMockSession(profileData)
 		const ctx = createContext({ session })
 
 		const resultPromise = cpuProfilePlugin.execute(ctx, { duration: '1000' })
-		jest.advanceTimersByTime(1000)
+		vi.advanceTimersByTime(1000)
 		await resultPromise
 
 		expect(fs.writeFileSync).toHaveBeenCalledWith('/tmp/test-uuid.cpuprofile', JSON.stringify(profileData))
@@ -113,7 +114,7 @@ describe('cpuProfilePlugin', () => {
 		const ctx = createContext()
 		const resultPromise = cpuProfilePlugin.execute(ctx, { duration: '1000' })
 
-		jest.advanceTimersByTime(1000)
+		vi.advanceTimersByTime(1000)
 		await resultPromise
 
 		expect(ctx.session.sendMessage).toHaveBeenCalledWith('Profiler.disable')
@@ -121,23 +122,23 @@ describe('cpuProfilePlugin', () => {
 
 	it('should return error when Profiler.stop rejects', async () => {
 		const session = {
-			evaluate: jest.fn(),
-			sendMessage: jest.fn().mockImplementation((method: string) => {
+			evaluate: vi.fn(),
+			sendMessage: vi.fn().mockImplementation((method: string) => {
 				if (method === 'Profiler.stop') {
 					return Promise.reject(new Error('Profiler not started'))
 				}
 				return Promise.resolve({})
 			}),
-			open: jest.fn(),
-			connect: jest.fn(),
-			close: jest.fn(),
-			closeInspector: jest.fn(),
+			open: vi.fn(),
+			connect: vi.fn(),
+			close: vi.fn(),
+			closeInspector: vi.fn(),
 		} as any
 
 		const ctx = createContext({ session })
 		const resultPromise = cpuProfilePlugin.execute(ctx, { duration: '1000' })
 
-		jest.advanceTimersByTime(1000)
+		vi.advanceTimersByTime(1000)
 		const result = await resultPromise
 
 		expect(result.success).toBe(false)

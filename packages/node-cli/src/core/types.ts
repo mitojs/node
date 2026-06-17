@@ -11,7 +11,7 @@ export interface DiagnosticContext {
 	pid: number
 	port: number
 	json: boolean
-	session: InspectorSession
+	session?: InspectorSession
 	agentClient?: AgentClient
 	output: (data: OutputData) => void
 }

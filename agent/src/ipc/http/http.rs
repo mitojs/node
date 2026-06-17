@@ -15,7 +15,7 @@ use crate::{error_print, log_print};
 use super::{
     common::BaseRouter,
     endpoints::{
-        heartbeat::HEARTBEAT_ROUTER, info::INFO_ROUTER, metrics::{METRICS_ROUTER, METRICS_PUSH_ROUTER}, update_process::UPDATE_PROCESS_ROUTER,
+        heartbeat::HEARTBEAT_ROUTER, info::INFO_ROUTER, metrics::{METRICS_ROUTER, METRICS_PUSH_ROUTER}, register_process::REGISTER_PROCESS_ROUTER, update_process::UPDATE_PROCESS_ROUTER,
     },
 };
 
@@ -33,7 +33,7 @@ pub async fn setup_http_server(
         .route("/", get(get_agent_name))
         .layer(CorsLayer::permissive()); // CORS 支持
 
-    const ROUTERS: [&dyn BaseRouter; 5] = [&INFO_ROUTER, &UPDATE_PROCESS_ROUTER, &HEARTBEAT_ROUTER, &METRICS_ROUTER, &METRICS_PUSH_ROUTER];
+    const ROUTERS: [&dyn BaseRouter; 6] = [&INFO_ROUTER, &UPDATE_PROCESS_ROUTER, &HEARTBEAT_ROUTER, &METRICS_ROUTER, &METRICS_PUSH_ROUTER, &REGISTER_PROCESS_ROUTER];
     for router in ROUTERS {
         app = app.route(router.get_path(), (router.get_handler())());
     }

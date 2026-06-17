@@ -13,12 +13,29 @@ interface CmdOptions {
 	json?: boolean
 }
 
+// CLI 命令名 → SDK Subject 名的映射
+const COMMAND_SUBJECT_MAP: Record<string, string> = {
+	'monitor-cpu': 'CPU',
+	memory: 'Memory',
+	'monitor-memory': 'Memory',
+	timers: 'Timeout',
+}
+
 registerBuiltinPlugins()
 
 program
 	.option('-p, --pid <pid>', 'process id of the target process')
 	.option('--port <port>', 'inspector port of the target process', '9229')
 	.option('--json', 'output in JSON format for programmatic consumption', false)
+	.option('-i, --interactive', 'enter interactive TUI mode', false)
+	.action(() => {
+		if (program.opts().interactive) {
+			// @ts-expect-error 独立打包产物，运行时由 cli.mjs 同目录的 interactive-cli.mjs 提供
+			import('./interactive-cli.mjs')
+		} else {
+			program.help()
+		}
+	})
 
 for (const plugin of registry.getAll()) {
 	const command = program.command(plugin.name).description(plugin.description)
@@ -53,29 +70,68 @@ for (const plugin of registry.getAll()) {
 		const json = globalOpts.json ?? false
 		const output = createOutputFormatter(json)
 
-		// 自动检测 Agent 是否可用
+		// 自动检测 Agent 是否可用，并判断是否需要 Inspector
 		const agentClient = new AgentClient()
 		const agentAvailable = await agentClient.isAvailable()
-		if (agentAvailable) {
-			logger.debug('Agent detected, SDK channel available')
-		}
 
-		const session = new InspectorSession()
-		try {
-			await session.open(pid, resolvedPort)
-			await session.connect(resolvedPort)
-		} catch (e: any) {
-			if (e instanceof InspectorError) {
-				output({ success: false, command: plugin.name, error: e.message, errorCode: e.code, suggestion: e.suggestion })
+		let session: InspectorSession | undefined
+		let passAgentClient: AgentClient | undefined
+
+		if (agentAvailable) {
+			const processInfo = await agentClient.getProcessInfo(pid)
+			const requiredSubject = COMMAND_SUBJECT_MAP[plugin.name]
+
+			if (processInfo && requiredSubject && processInfo.registeredSubjects.includes(requiredSubject)) {
+				// Agent 已注册对应的 subject → 不开 Inspector，走 Agent 通道
+				logger.debug(`Subject "${requiredSubject}" registered in Agent, skipping Inspector`)
+				passAgentClient = agentClient
 			} else {
-				output({ success: false, command: plugin.name, error: e.message })
+				// Agent 没注册对应 subject 或命令不在 map 中 → 开 Inspector
+				session = new InspectorSession()
+				try {
+					await session.open(pid, resolvedPort)
+					await session.connect(resolvedPort)
+				} catch (e: any) {
+					if (e instanceof InspectorError) {
+						output({
+							success: false,
+							command: plugin.name,
+							error: e.message,
+							errorCode: e.code,
+							suggestion: e.suggestion,
+						})
+					} else {
+						output({ success: false, command: plugin.name, error: e.message })
+					}
+					process.exit(1)
+				}
+				passAgentClient = agentClient
 			}
-			process.exit(1)
+		} else {
+			// Agent 不可用 → 开 Inspector
+			session = new InspectorSession()
+			try {
+				await session.open(pid, resolvedPort)
+				await session.connect(resolvedPort)
+			} catch (e: any) {
+				if (e instanceof InspectorError) {
+					output({
+						success: false,
+						command: plugin.name,
+						error: e.message,
+						errorCode: e.code,
+						suggestion: e.suggestion,
+					})
+				} else {
+					output({ success: false, command: plugin.name, error: e.message })
+				}
+				process.exit(1)
+			}
 		}
 
 		try {
 			const result = await plugin.execute(
-				{ pid, port: resolvedPort, json, session, agentClient: agentAvailable ? agentClient : undefined, output },
+				{ pid, port: resolvedPort, json, session, agentClient: passAgentClient, output },
 				cmdOptions
 			)
 			if (result.success) {
@@ -83,24 +139,21 @@ for (const plugin of registry.getAll()) {
 			} else {
 				output({ success: false, command: plugin.name, error: result.error })
 			}
-		} catch (e) {
-			output({ success: false, command: plugin.name, error: (e as Error).message })
+		} catch (e: any) {
+			if (e instanceof InspectorError) {
+				output({ success: false, command: plugin.name, error: e.message, errorCode: e.code, suggestion: e.suggestion })
+			} else {
+				output({ success: false, command: plugin.name, error: (e as Error).message })
+			}
 		}
 
 		// start-inspect 需要保持 Inspector 开启供 DevTools 连接，不执行 cleanup
-		if (plugin.name !== 'start-inspect') {
+		if (plugin.name !== 'start-inspect' && session) {
 			session.closeInspector().catch(() => {})
 		}
-		session.close()
+		if (session) session.close()
 		process.exit(0)
 	})
 }
 
 program.parse(process.argv)
-
-// 无子命令时自动进入 TUI 交互模式
-const userArgs = process.argv.slice(2)
-const hasSubcommand = registry.getAll().some((p) => userArgs.includes(p.name))
-if (!userArgs.length || (!hasSubcommand && !userArgs.includes('--help') && !userArgs.includes('-h'))) {
-	import('./interactive-cli.js')
-}

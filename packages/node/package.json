@@ -19,13 +19,14 @@
 	"scripts": {
 		"esm": "tsc -b ./tsconfig.json",
 		"watch:esm": "tsc -b ./tsconfig.json --watch",
-		"test": "jest --config jest.config.cjs",
+		"test": "vitest run",
 		"build:rust": "cd ../../agent && ./build.sh",
 		"prebuild": "npm run build:rust",
 		"build": "npm run esm"
 	},
 	"devDependencies": {
-		"@mono/tsconfig": "workspace:*"
+		"@mono/tsconfig": "workspace:*",
+		"vitest": "^4.1.8"
 	},
 	"dependencies": {
 		"deepmerge": "^4.3.1",

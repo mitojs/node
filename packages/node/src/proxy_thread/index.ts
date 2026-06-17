@@ -4,8 +4,8 @@ import { createHttpServer, DEFAULT_TCP_PORT, IpcMessageCode, logger } from '../s
 
 function parseBody(req: http.IncomingMessage): Promise<any> {
 	return new Promise((resolve, reject) => {
-		const chunks: Buffer[] = []
-		req.on('data', (chunk: Buffer) => chunks.push(chunk))
+		const chunks: Uint8Array[] = []
+		req.on('data', (chunk: Uint8Array) => chunks.push(chunk))
 		req.on('end', () => {
 			try {
 				const body = Buffer.concat(chunks).toString()

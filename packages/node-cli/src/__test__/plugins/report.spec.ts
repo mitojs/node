@@ -1,20 +1,21 @@
+import { describe, expect, it, vi } from 'vitest'
 import type { DiagnosticContext } from '../../core/types'
 import { reportPlugin } from '../../plugins/report'
 import type { InspectorSession } from '../../services/inspector-session'
 
-jest.mock('../../helper', () => ({
-	genFilename: jest.fn().mockReturnValue('/tmp/test-uuid.json'),
-	FUNCTION_WRAPPER: jest.fn((code: string) => `wrapped(${code})`),
+vi.mock('../../helper', () => ({
+	genFilename: vi.fn().mockReturnValue('/tmp/test-uuid.json'),
+	FUNCTION_WRAPPER: vi.fn((code: string) => `wrapped(${code})`),
 }))
 
 function createMockSession(evaluateResult: any): InspectorSession {
 	return {
-		evaluate: jest.fn().mockResolvedValue(evaluateResult),
-		sendMessage: jest.fn(),
-		open: jest.fn(),
-		connect: jest.fn(),
-		close: jest.fn(),
-		closeInspector: jest.fn(),
+		evaluate: vi.fn().mockResolvedValue(evaluateResult),
+		sendMessage: vi.fn(),
+		open: vi.fn(),
+		connect: vi.fn(),
+		close: vi.fn(),
+		closeInspector: vi.fn(),
 	} as any
 }
 
@@ -24,7 +25,7 @@ function createContext(overrides: Partial<DiagnosticContext> = {}): DiagnosticCo
 		port: 9229,
 		json: false,
 		session: createMockSession(undefined),
-		output: jest.fn(),
+		output: vi.fn(),
 		...overrides,
 	}
 }
@@ -45,7 +46,7 @@ describe('reportPlugin', () => {
 		await reportPlugin.execute(ctx, {})
 
 		expect(session.evaluate).toHaveBeenCalledTimes(1)
-		const evaluateArg = (session.evaluate as jest.Mock).mock.calls[0][0]
+		const evaluateArg = vi.mocked(session.evaluate).mock.calls[0][0]
 		expect(evaluateArg).toContain('process.report.writeReport')
 	})
 
@@ -55,7 +56,7 @@ describe('reportPlugin', () => {
 
 		await reportPlugin.execute(ctx, {})
 
-		const evaluateArg = (session.evaluate as jest.Mock).mock.calls[0][0]
+		const evaluateArg = vi.mocked(session.evaluate).mock.calls[0][0]
 		expect(evaluateArg).toContain('/tmp/test-uuid.json')
 	})
 
@@ -71,12 +72,12 @@ describe('reportPlugin', () => {
 
 	it('should propagate error when session.evaluate rejects', async () => {
 		const session = {
-			evaluate: jest.fn().mockRejectedValue(new Error('Evaluate failed')),
-			sendMessage: jest.fn(),
-			open: jest.fn(),
-			connect: jest.fn(),
-			close: jest.fn(),
-			closeInspector: jest.fn(),
+			evaluate: vi.fn().mockRejectedValue(new Error('Evaluate failed')),
+			sendMessage: vi.fn(),
+			open: vi.fn(),
+			connect: vi.fn(),
+			close: vi.fn(),
+			closeInspector: vi.fn(),
 		} as any
 		const ctx = createContext({ session })
 
@@ -89,8 +90,8 @@ describe('reportPlugin', () => {
 
 		await reportPlugin.execute(ctx, {})
 
-		const { FUNCTION_WRAPPER } = require('../../helper')
-		const wrappedCode = (FUNCTION_WRAPPER as jest.Mock).mock.calls[0][0]
+		const { FUNCTION_WRAPPER } = await import('../../helper')
+		const wrappedCode = vi.mocked(FUNCTION_WRAPPER).mock.calls[0][0]
 		expect(wrappedCode).toContain('process.report')
 		expect(wrappedCode).toContain('writeReport')
 		expect(wrappedCode).toContain('throw new Error')

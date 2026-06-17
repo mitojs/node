@@ -1,6 +1,7 @@
 import { existsSync } from 'fs'
 import { arch, platform } from 'os'
 import { join } from 'path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createAgent, getPlatformInfo, MitojsAgent } from '../binary'
 
 describe('Binary Management', () => {
@@ -68,8 +69,6 @@ describe('Binary Management', () => {
 			const platformInfo = getPlatformInfo()
 			const binaryPath = join(__dirname, '..', '..', 'binaries', platformInfo.binaryName)
 
-			// 注意：这个测试可能会失败，如果二进制文件还没有构建
-			// 在实际使用中，应该先运行构建脚本
 			if (existsSync(binaryPath)) {
 				expect(existsSync(binaryPath)).toBe(true)
 			} else {
@@ -78,11 +77,7 @@ describe('Binary Management', () => {
 			}
 		})
 
-		// 这个测试需要实际的二进制文件存在
 		it.skip('should start and stop agent process', async () => {
-			// 跳过这个测试，因为需要实际的二进制文件
-			// 在有二进制文件的情况下可以启用
-
 			expect(agent.isRunning()).toBe(false)
 
 			await agent.start()
@@ -95,13 +90,11 @@ describe('Binary Management', () => {
 		}, 10000)
 
 		it('should handle multiple start attempts', async () => {
-			// 模拟多次启动的情况
 			const startPromise1 = agent.start().catch((err) => err)
 			const startPromise2 = agent.start().catch((err) => err)
 
 			const results = await Promise.all([startPromise1, startPromise2])
 
-			// 至少有一个应该成功或者都应该有适当的错误处理
 			expect(results).toHaveLength(2)
 		})
 	})
@@ -113,7 +106,7 @@ describe('Binary Management', () => {
 
 			expect(agent1).toBeInstanceOf(MitojsAgent)
 			expect(agent2).toBeInstanceOf(MitojsAgent)
-			expect(agent1).not.toBe(agent2) // 应该是不同的实例
+			expect(agent1).not.toBe(agent2)
 		})
 	})
 })

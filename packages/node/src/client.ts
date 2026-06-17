@@ -82,7 +82,8 @@ export class MitoNode {
 		try {
 			await initAgent()
 			logger.info('rust agent started successfully')
-			await SyncToAgent()
+			const enabledSubjects = this.getEnabledSubjects()
+			await SyncToAgent(enabledSubjects)
 			await initProxyThread()
 			// 设置全局 flag，CLI 可通过此标志判断 SDK 是否已加载
 			;(globalThis as any).__MITO_NODE_ACTIVE__ = true
@@ -91,6 +92,17 @@ export class MitoNode {
 		} catch (error) {
 			logger.error('start MitoNode error', error)
 		}
+	}
+
+	private getEnabledSubjects(): string[] {
+		const metrics = this._options.metrics || {}
+		const subjects: string[] = []
+		for (const [name, config] of Object.entries(metrics)) {
+			if (config !== false && config !== undefined) {
+				subjects.push(name)
+			}
+		}
+		return subjects
 	}
 
 	destroy() {

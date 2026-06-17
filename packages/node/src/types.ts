@@ -10,6 +10,7 @@ export interface ConfigType {
 export interface RegisterProcessData {
 	pid: number
 	udsPath: string
+	subjects: string[]
 }
 
 export interface IpcMessage {

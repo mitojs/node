@@ -1,64 +1,35 @@
-import { render } from 'ink'
-import React from 'react'
-import CPUGraph from '../CPUGraph.js'
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { FUNCTION_WRAPPER } from '../helper.js'
+import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
 
 export const monitorCpuPlugin: DiagnosticPlugin = {
 	name: 'monitor-cpu',
-	description: 'Real-time monitor CPU usage of the target process',
+	description: 'Monitor CPU usage of the target process',
 	async execute(ctx) {
-		let lastCpuData: { user: number; system: number; hrtime: bigint } | null = null
-
-		const getCPUDataFromInspector = async (): Promise<number> => {
-			const data = await ctx.session.evaluate(
-				FUNCTION_WRAPPER(`
-					const usage = process.cpuUsage();
-					const hrtime = process.hrtime.bigint();
-					return { user: usage.user, system: usage.system, hrtime: hrtime.toString() };
-				`)
-			)
-			const current = { user: data.user, system: data.system, hrtime: BigInt(data.hrtime) }
-			if (!lastCpuData) {
-				lastCpuData = current
-				return 0
-			}
-			const timeDiff = Number(current.hrtime - lastCpuData.hrtime) / 1e3
-			const userDiff = current.user - lastCpuData.user
-			const systemDiff = current.system - lastCpuData.system
-			lastCpuData = current
-			if (timeDiff <= 0) return 0
-			return Math.min(((userDiff + systemDiff) / timeDiff) * 100, 100)
-		}
-
-		const getCPUDataFromAgent = async (): Promise<number> => {
-			const metrics = await ctx.agentClient!.getMetrics(ctx.pid)
+		if (ctx.agentClient) {
+			const metrics = await ctx.agentClient.getMetrics(ctx.pid)
 			if (metrics?.cpu) {
-				return (metrics.cpu as any).load ?? 0
-			}
-			return getCPUDataFromInspector()
-		}
-
-		const getCPUData = ctx.agentClient ? getCPUDataFromAgent : getCPUDataFromInspector
-
-		if (ctx.json) {
-			while (true) {
-				try {
-					const cpuPercent = await getCPUData()
-					process.stdout.write(
-						JSON.stringify({ success: true, command: 'monitor-cpu', data: { cpuPercent, timestamp: Date.now() } }) +
-							'\n'
-					)
-				} catch {
-					break
+				const cpu = metrics.cpu as { load?: number }
+				return {
+					success: true,
+					data: { cpuPercent: cpu.load ?? 0, source: 'agent' },
 				}
-				await new Promise((resolve) => setTimeout(resolve, 1000))
 			}
-		} else {
-			render(React.createElement(CPUGraph, { getCPUData }))
-			await new Promise(() => {})
 		}
 
-		return { success: true }
+		const session = await ensureSession(ctx)
+		const data = await session.evaluate(
+			FUNCTION_WRAPPER(`
+				const usage = process.cpuUsage();
+				const hrtime = process.hrtime.bigint();
+				return { user: usage.user, system: usage.system, hrtime: hrtime.toString() };
+			`)
+		)
+		// CPU 百分比需要两次采样计算差值，单次快照返回当前累计使用率
+		const totalCpuMicros = data.user + data.system
+		const uptimeNs = BigInt(data.hrtime)
+		const uptimeMicros = Number(uptimeNs) / 1e3
+		const cpuPercent = uptimeMicros > 0 ? Math.min((totalCpuMicros / uptimeMicros) * 100, 100) : 0
+
+		return { success: true, data: { cpuPercent, source: 'inspector' } }
 	},
 }

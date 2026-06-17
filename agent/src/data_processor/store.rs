@@ -100,6 +100,7 @@ pub struct ProcessStore {
     // timestamp second
     pub latest_heartbeat_time: u64,
     pub metrics: ProcessMetrics,
+    pub registered_subjects: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -140,6 +141,7 @@ impl Store {
                     .latest_heartbeat_time
                     .unwrap_or(old.latest_heartbeat_time),
                 metrics: old.metrics.clone(),
+                registered_subjects: old.registered_subjects.clone(),
             };
             data.insert(*key, new);
         }
@@ -151,6 +153,7 @@ impl Store {
             uds_port: 0,
             latest_heartbeat_time: 0,
             metrics: ProcessMetrics::new(),
+            registered_subjects: Vec::new(),
         });
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
