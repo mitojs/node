@@ -1,5 +1,5 @@
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
+import { DataSource, ensureSession, FUNCTION_WRAPPER, ok } from '../helper.js'
 
 export const monitorCpuPlugin: DiagnosticPlugin = {
 	name: 'monitor-cpu',
@@ -9,10 +9,7 @@ export const monitorCpuPlugin: DiagnosticPlugin = {
 			const metrics = await ctx.agentClient.getMetrics(ctx.pid)
 			if (metrics?.cpu) {
 				const cpu = metrics.cpu as { load?: number }
-				return {
-					success: true,
-					data: { cpuPercent: cpu.load ?? 0, source: 'agent' },
-				}
+				return ok({ cpuPercent: cpu.load ?? 0 }, DataSource.AGENT)
 			}
 		}
 
@@ -30,6 +27,6 @@ export const monitorCpuPlugin: DiagnosticPlugin = {
 		const uptimeMicros = Number(uptimeNs) / 1e3
 		const cpuPercent = uptimeMicros > 0 ? Math.min((totalCpuMicros / uptimeMicros) * 100, 100) : 0
 
-		return { success: true, data: { cpuPercent, source: 'inspector' } }
+		return ok({ cpuPercent }, DataSource.INSPECTOR)
 	},
 }

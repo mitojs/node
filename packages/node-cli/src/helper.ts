@@ -1,6 +1,6 @@
 import { tmpdir } from 'node:os'
 import { v4 as uuidv4 } from 'uuid'
-import type { DiagnosticContext } from './core/types.js'
+import type { DiagnosticContext, DiagnosticResult } from './core/types.js'
 import { InspectorSession } from './services/inspector-session.js'
 
 const tmpdirPath = tmpdir()
@@ -54,3 +54,21 @@ export const FUNCTION_WRAPPER = (code: string) => `(async function() {
         }
     })();
     `
+
+export const DataSource = {
+	AGENT: 'agent',
+	INSPECTOR: 'inspector',
+} as const
+
+export type DataSource = (typeof DataSource)[keyof typeof DataSource]
+
+export function ok(data: any, source?: DataSource): DiagnosticResult {
+	if (source) {
+		return { success: true, data: { ...data, source } }
+	}
+	return { success: true, data }
+}
+
+export function fail(error: string): DiagnosticResult {
+	return { success: false, error }
+}

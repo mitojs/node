@@ -1,5 +1,5 @@
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
+import { DataSource, ensureSession, FUNCTION_WRAPPER, fail, ok } from '../helper.js'
 
 export const timersPlugin: DiagnosticPlugin = {
 	name: 'timers',
@@ -9,7 +9,7 @@ export const timersPlugin: DiagnosticPlugin = {
 		if (ctx.agentClient) {
 			const metrics = await ctx.agentClient.getMetrics(ctx.pid)
 			if (metrics?.timers && Array.isArray(metrics.timers) && metrics.timers.length > 0) {
-				return { success: true, data: { timers: metrics.timers, source: 'agent' } }
+				return ok({ timers: metrics.timers }, DataSource.AGENT)
 			}
 		}
 
@@ -18,21 +18,16 @@ export const timersPlugin: DiagnosticPlugin = {
 		const data = await session.evaluate(
 			FUNCTION_WRAPPER(`
 				if (globalThis.__MITO_NODE_ACTIVE__) {
-					// SDK 已加载但 Agent 不可用时，尝试从全局获取定时器数据
 					return { sdkActive: true, message: 'Timer data is available via Agent channel. Ensure Rust Agent is running.' };
 				}
-				// SDK 未加载，无法获取定时器信息
 				return { sdkActive: false, message: 'Timer detection requires @mitojs/node SDK to be loaded in the target process.' };
 			`)
 		)
 
 		if (data?.sdkActive === false) {
-			return {
-				success: false,
-				error: data.message,
-			}
+			return fail(data.message)
 		}
 
-		return { success: true, data: { ...data, source: 'inspector' } }
+		return ok(data, DataSource.INSPECTOR)
 	},
 }

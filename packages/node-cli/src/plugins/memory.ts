@@ -1,5 +1,5 @@
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
+import { DataSource, ensureSession, FUNCTION_WRAPPER, ok } from '../helper.js'
 
 export const memoryPlugin: DiagnosticPlugin = {
 	name: 'memory',
@@ -9,12 +9,12 @@ export const memoryPlugin: DiagnosticPlugin = {
 		if (ctx.agentClient) {
 			const metrics = await ctx.agentClient.getMetrics(ctx.pid)
 			if (metrics?.memory) {
-				return { success: true, data: { ...metrics.memory, source: 'agent' } }
+				return ok(metrics.memory, DataSource.AGENT)
 			}
 		}
 		// 回退到 Inspector 注入
 		const session = await ensureSession(ctx)
 		const data = await session.evaluate(FUNCTION_WRAPPER(`return process.memoryUsage();`))
-		return { success: true, data: { ...data, source: 'inspector' } }
+		return ok(data, DataSource.INSPECTOR)
 	},
 }

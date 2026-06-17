@@ -1,5 +1,5 @@
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
+import { DataSource, ensureSession, FUNCTION_WRAPPER, ok } from '../helper.js'
 
 export const monitorMemoryPlugin: DiagnosticPlugin = {
 	name: 'monitor-memory',
@@ -9,15 +9,14 @@ export const monitorMemoryPlugin: DiagnosticPlugin = {
 			const metrics = await ctx.agentClient.getMetrics(ctx.pid)
 			if (metrics?.memory) {
 				const mem = metrics.memory as any
-				return {
-					success: true,
-					data: {
+				return ok(
+					{
 						heapUsed: mem.heapUsed ?? mem.heap_used ?? 0,
 						heapTotal: mem.heapTotal ?? mem.heap_total ?? 0,
 						rss: mem.rss ?? 0,
-						source: 'agent',
 					},
-				}
+					DataSource.AGENT
+				)
 			}
 		}
 
@@ -28,6 +27,6 @@ export const monitorMemoryPlugin: DiagnosticPlugin = {
 				return { heapUsed: mem.heapUsed, heapTotal: mem.heapTotal, rss: mem.rss };
 			`)
 		)
-		return { success: true, data: { ...data, source: 'inspector' } }
+		return ok(data, DataSource.INSPECTOR)
 	},
 }
