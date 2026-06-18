@@ -37,6 +37,7 @@
 		"test": "vitest run"
 	},
 	"dependencies": {
+		"@mitojs/node-shared": "workspace:*",
 		"@types/ink": "2.0.3",
 		"@types/react": "19.0.8",
 		"commander": "^14.0.0",

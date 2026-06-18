@@ -29,6 +29,7 @@
 		"vitest": "^4.1.8"
 	},
 	"dependencies": {
+		"@mitojs/node-shared": "workspace:*",
 		"deepmerge": "^4.3.1",
 		"rxjs": "^7.8.2"
 	}

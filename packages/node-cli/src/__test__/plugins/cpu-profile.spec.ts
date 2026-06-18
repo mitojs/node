@@ -7,10 +7,14 @@ vi.mock('node:fs', () => ({
 	writeFileSync: vi.fn(),
 }))
 
-vi.mock('../../helper', () => ({
-	genFilename: vi.fn().mockReturnValue('/tmp/test-uuid.cpuprofile'),
-	FUNCTION_WRAPPER: vi.fn((code: string) => code),
-}))
+vi.mock('../../helper', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../../helper')>()
+	return {
+		...actual,
+		genFilename: vi.fn().mockReturnValue('/tmp/test-uuid.cpuprofile'),
+		ensureSession: vi.fn((ctx: any) => Promise.resolve(ctx.session)),
+	}
+})
 
 function createMockSession(profileData: any): InspectorSession {
 	return {
@@ -58,25 +62,28 @@ describe('cpuProfilePlugin', () => {
 		expect(cpuProfilePlugin.options![0].defaultValue).toBe('10000')
 	})
 
-	it('should call Profiler.enable and Profiler.start immediately', () => {
+	it('should call Profiler.enable and Profiler.start immediately', async () => {
 		const ctx = createContext()
 		cpuProfilePlugin.execute(ctx, { duration: '5000' })
+		// 等待 ensureSession 的微任务完成
+		await Promise.resolve()
 
-		expect(ctx.session.sendMessage).toHaveBeenCalledWith('Profiler.enable')
-		expect(ctx.session.sendMessage).toHaveBeenCalledWith('Profiler.start')
+		expect(ctx.session!.sendMessage).toHaveBeenCalledWith('Profiler.enable')
+		expect(ctx.session!.sendMessage).toHaveBeenCalledWith('Profiler.start')
 	})
 
 	it('should call Profiler.stop after the specified duration', async () => {
 		const ctx = createContext()
 		const resultPromise = cpuProfilePlugin.execute(ctx, { duration: '5000' })
+		await Promise.resolve()
 
 		// Profiler.stop 还不应被调用
-		expect(ctx.session.sendMessage).not.toHaveBeenCalledWith('Profiler.stop')
+		expect(ctx.session!.sendMessage).not.toHaveBeenCalledWith('Profiler.stop')
 
-		vi.advanceTimersByTime(5000)
+		await vi.advanceTimersByTimeAsync(5000)
 		const result = await resultPromise
 
-		expect(ctx.session.sendMessage).toHaveBeenCalledWith('Profiler.stop')
+		expect(ctx.session!.sendMessage).toHaveBeenCalledWith('Profiler.stop')
 		expect(result.success).toBe(true)
 		expect(result.data.filename).toBe('/tmp/test-uuid.cpuprofile')
 	})
@@ -84,16 +91,17 @@ describe('cpuProfilePlugin', () => {
 	it('should use default duration of 10000ms when not specified', async () => {
 		const ctx = createContext()
 		const resultPromise = cpuProfilePlugin.execute(ctx, {})
+		await Promise.resolve()
 
 		// 5 秒后不该结束
-		vi.advanceTimersByTime(5000)
-		expect(ctx.session.sendMessage).not.toHaveBeenCalledWith('Profiler.stop')
+		await vi.advanceTimersByTimeAsync(5000)
+		expect(ctx.session!.sendMessage).not.toHaveBeenCalledWith('Profiler.stop')
 
 		// 再推进 5 秒（总计 10 秒）才结束
-		vi.advanceTimersByTime(5000)
+		await vi.advanceTimersByTimeAsync(5000)
 		const result = await resultPromise
 
-		expect(ctx.session.sendMessage).toHaveBeenCalledWith('Profiler.stop')
+		expect(ctx.session!.sendMessage).toHaveBeenCalledWith('Profiler.stop')
 		expect(result.success).toBe(true)
 	})
 
@@ -104,7 +112,7 @@ describe('cpuProfilePlugin', () => {
 		const ctx = createContext({ session })
 
 		const resultPromise = cpuProfilePlugin.execute(ctx, { duration: '1000' })
-		vi.advanceTimersByTime(1000)
+		await vi.advanceTimersByTimeAsync(1000)
 		await resultPromise
 
 		expect(fs.writeFileSync).toHaveBeenCalledWith('/tmp/test-uuid.cpuprofile', JSON.stringify(profileData))
@@ -114,10 +122,10 @@ describe('cpuProfilePlugin', () => {
 		const ctx = createContext()
 		const resultPromise = cpuProfilePlugin.execute(ctx, { duration: '1000' })
 
-		vi.advanceTimersByTime(1000)
+		await vi.advanceTimersByTimeAsync(1000)
 		await resultPromise
 
-		expect(ctx.session.sendMessage).toHaveBeenCalledWith('Profiler.disable')
+		expect(ctx.session!.sendMessage).toHaveBeenCalledWith('Profiler.disable')
 	})
 
 	it('should return error when Profiler.stop rejects', async () => {
@@ -138,7 +146,7 @@ describe('cpuProfilePlugin', () => {
 		const ctx = createContext({ session })
 		const resultPromise = cpuProfilePlugin.execute(ctx, { duration: '1000' })
 
-		vi.advanceTimersByTime(1000)
+		await vi.advanceTimersByTimeAsync(1000)
 		const result = await resultPromise
 
 		expect(result.success).toBe(false)

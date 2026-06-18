@@ -4,9 +4,13 @@ import { timersPlugin } from '../../plugins/timers'
 import type { AgentClient, MetricsData } from '../../services/agent-client'
 import type { InspectorSession } from '../../services/inspector-session'
 
-vi.mock('../../helper', () => ({
-	FUNCTION_WRAPPER: vi.fn((code: string) => `wrapped(${code})`),
-}))
+vi.mock('../../helper', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../../helper')>()
+	return {
+		...actual,
+		FUNCTION_WRAPPER: vi.fn((code: string) => `wrapped(${code})`),
+	}
+})
 
 function createMockSession(evaluateResult: any): InspectorSession {
 	return {

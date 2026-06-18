@@ -1,0 +1,46 @@
+{
+	"name": "@mitojs/node-shared",
+	"version": "0.0.1",
+	"private": true,
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./types": {
+			"types": "./dist/types/index.d.ts",
+			"default": "./dist/types/index.js"
+		},
+		"./constants": {
+			"types": "./dist/constants/index.d.ts",
+			"default": "./dist/constants/index.js"
+		},
+		"./recipes": {
+			"types": "./dist/recipes/index.d.ts",
+			"default": "./dist/recipes/index.js"
+		}
+	},
+	"typesVersions": {
+		"*": {
+			"types": [
+				"./dist/types/index.d.ts"
+			],
+			"constants": [
+				"./dist/constants/index.d.ts"
+			],
+			"recipes": [
+				"./dist/recipes/index.d.ts"
+			]
+		}
+	},
+	"scripts": {
+		"build": "tsc -b",
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"@mono/tsconfig": "workspace:*",
+		"vitest": "^4.1.8"
+	}
+}

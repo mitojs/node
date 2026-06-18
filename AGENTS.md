@@ -117,20 +117,21 @@
 
 ### TypeScript 测试
 
-**框架：** Jest + ts-jest
+**框架：** Vitest（v4.x）
 
 **配置：**
-- 根目录 `jest.config.js`：`preset: 'ts-jest'`，`testEnvironment: 'node'`
-- 各包配置（`jest.config.cjs`）复用根配置
+- 各包独立 `vitest.config.ts`：`globals: true`，`environment: 'node'`
 - 测试文件匹配模式：`**/*.spec.ts`
+- 显式导入 `describe/it/expect/vi/beforeEach` 自 `vitest`
 
 **测试位置：**
 - `packages/node/src/__test__/` — 采集器测试（CPU、JS Error、Timeout）、二进制测试
 
 **运行测试：**
 ```bash
-pnpm test                            # 并行运行所有包的测试
+pnpm test                            # 并行运行所有包的 vitest
 pnpm --filter @mitojs/node test      # 运行单个包的测试
+pnpm --filter @mitojs/node-cli test  # 运行 CLI 包的测试
 ```
 
 ### Rust Agent 测试
@@ -166,6 +167,29 @@ cargo test <test_name>                # 运行单个测试
 
 ---
 
+## TDD 测试驱动开发
+
+开发新功能或修复缺陷时，必须遵循 TDD 范式：**先写失败测试 → 实现代码使其通过 → 重构**。
+
+### 流程
+
+```
+Red → Green → Refactor
+```
+
+1. **Red**：编写一个描述预期行为的测试，运行确认失败。
+2. **Green**：编写最少量实现代码使测试通过。
+3. **Refactor**：在测试保护下优化代码结构。
+
+### 要求
+
+- 不允许在没有对应测试的情况下提交新的业务逻辑。
+- 测试覆盖正常路径（happy path）和异常路径（error/edge case）。
+- Mock 仅用于隔离外部依赖，不 mock 被测模块本身的内部逻辑。
+- 提交前确保所有测试通过：`pnpm test` + `cd agent && cargo test`。
+
+---
+
 ## 安全
 
 - Rust Agent 二进制以子进程方式启动，通过 fd 3 进行 IPC 通信。确保 `packages/node/binaries/` 中的二进制文件可信且未被篡改。
@@ -183,8 +207,6 @@ cargo test <test_name>                # 运行单个测试
 ```yaml
 packages:
   - 'packages/*'
-  - 'utils/*'
-  - 'app/*'
 ```
 
 **关键配置文件：**

@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid'
 import type { DiagnosticContext, DiagnosticResult } from './core/types.js'
 import { InspectorSession } from './services/inspector-session.js'
 
+export { DataSource } from '@mitojs/node-shared/constants'
+
 const tmpdirPath = tmpdir()
 
 export function getDay(): string {
@@ -55,14 +57,7 @@ export const FUNCTION_WRAPPER = (code: string) => `(async function() {
     })();
     `
 
-export const DataSource = {
-	AGENT: 'agent',
-	INSPECTOR: 'inspector',
-} as const
-
-export type DataSource = (typeof DataSource)[keyof typeof DataSource]
-
-export function ok(data: any, source?: DataSource): DiagnosticResult {
+export function ok(data: any, source?: string): DiagnosticResult {
 	if (source) {
 		return { success: true, data: { ...data, source } }
 	}

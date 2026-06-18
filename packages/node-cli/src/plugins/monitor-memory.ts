@@ -1,3 +1,4 @@
+import { getMemorySnapshotInjectable } from '@mitojs/node-shared/recipes'
 import type { DiagnosticPlugin } from '../core/plugin.js'
 import { DataSource, ensureSession, FUNCTION_WRAPPER, ok } from '../helper.js'
 
@@ -21,12 +22,7 @@ export const monitorMemoryPlugin: DiagnosticPlugin = {
 		}
 
 		const session = await ensureSession(ctx)
-		const data = await session.evaluate(
-			FUNCTION_WRAPPER(`
-				const mem = process.memoryUsage();
-				return { heapUsed: mem.heapUsed, heapTotal: mem.heapTotal, rss: mem.rss };
-			`)
-		)
+		const data = await session.evaluate(FUNCTION_WRAPPER(getMemorySnapshotInjectable()))
 		return ok(data, DataSource.INSPECTOR)
 	},
 }

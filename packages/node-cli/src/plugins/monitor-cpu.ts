@@ -1,3 +1,4 @@
+import { getCpuSnapshotInjectable } from '@mitojs/node-shared/recipes'
 import type { DiagnosticPlugin } from '../core/plugin.js'
 import { DataSource, ensureSession, FUNCTION_WRAPPER, ok } from '../helper.js'
 
@@ -14,13 +15,7 @@ export const monitorCpuPlugin: DiagnosticPlugin = {
 		}
 
 		const session = await ensureSession(ctx)
-		const data = await session.evaluate(
-			FUNCTION_WRAPPER(`
-				const usage = process.cpuUsage();
-				const hrtime = process.hrtime.bigint();
-				return { user: usage.user, system: usage.system, hrtime: hrtime.toString() };
-			`)
-		)
+		const data = await session.evaluate(FUNCTION_WRAPPER(getCpuSnapshotInjectable()))
 		// CPU 百分比需要两次采样计算差值，单次快照返回当前累计使用率
 		const totalCpuMicros = data.user + data.system
 		const uptimeNs = BigInt(data.hrtime)

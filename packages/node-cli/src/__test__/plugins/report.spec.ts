@@ -3,10 +3,14 @@ import type { DiagnosticContext } from '../../core/types'
 import { reportPlugin } from '../../plugins/report'
 import type { InspectorSession } from '../../services/inspector-session'
 
-vi.mock('../../helper', () => ({
-	genFilename: vi.fn().mockReturnValue('/tmp/test-uuid.json'),
-	FUNCTION_WRAPPER: vi.fn((code: string) => `wrapped(${code})`),
-}))
+vi.mock('../../helper', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../../helper')>()
+	return {
+		...actual,
+		genFilename: vi.fn().mockReturnValue('/tmp/test-uuid.json'),
+		FUNCTION_WRAPPER: vi.fn((code: string) => `wrapped(${code})`),
+	}
+})
 
 function createMockSession(evaluateResult: any): InspectorSession {
 	return {
