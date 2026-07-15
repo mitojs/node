@@ -6,6 +6,8 @@
 
 当线上 JS 进程出现 CPU 飙高、内存泄漏、未捕获异常或定时器异常时，用户能够在最短时间内定位到问题的根本原因并采取行动。
 
+面向前端工程师的 2-3 周学习与交付路线见：[Node 监控 Agent 2-3 周实战小册](./docs/solutions/node-monitoring-agent-3week-handbook.md)。
+
 ---
 
 ## CLI 使用模式
