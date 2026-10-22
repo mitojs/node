@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { arch, platform } from 'node:os'
 import { join } from 'node:path'
 import { configMap } from './config'
-import { IpcMessageCode, logger } from './shared'
+import { IpcMessageCode } from './shared'
 import type { IpcMessage } from './types'
 
 /**
@@ -64,123 +64,153 @@ function getBinaryPath(): string {
 	return binaryPath
 }
 
-/**
- * Agent 进程管理类
- */
+/** 启动前校验已有端口的身份，避免将任意本地 HTTP 服务误认为 Agent。 */
+async function hasCompatibleAgent(): Promise<boolean> {
+	try {
+		const { easyFetch } = await import('./shared/utils')
+		const response = await easyFetch(`http://127.0.0.1:${configMap.get('agentTCPPort')}/info`, { timeout: 1000 })
+		const info = await response.json()
+		if (
+			response.status !== 200 ||
+			info.name !== 'mitojs-agent' ||
+			info.protocol_version !== 1 ||
+			info.status !== 'running' ||
+			!Number.isInteger(info.pid) ||
+			info.pid <= 0
+		) {
+			throw new Error('Agent port has an incompatible service identity or protocol')
+		}
+		return true
+	} catch (error) {
+		if ((error as Error).message.includes('ECONNREFUSED')) return false
+		throw error
+	}
+}
+
 export class MitojsAgent {
 	private process: ChildProcess | null = null
-	private binaryPath: string
+	private starting: Promise<void> | null = null
 
-	constructor() {
-		this.binaryPath = getBinaryPath()
+	// start 成功表示经过 /info 协议校验，已存在的 daemon 由其自身生命周期管理。
+	start(args: string[] = [], timeoutMs = 5000): Promise<void> {
+		if (this.starting) return this.starting
+		if (this.process) return Promise.resolve()
+		this.starting = this.startOnce(args, timeoutMs).finally(() => {
+			this.starting = null
+		})
+		return this.starting
 	}
-
-	/**
-	 * 启动 Agent 进程
-	 */
-	start(args: string[] = []): Promise<void> {
-		return new Promise((resolve, reject) => {
-			if (this.process) {
-				reject(new Error('Agent 进程已经在运行中'))
-				return
-			}
-			logger.info(
-				`调用 Rust Binary 启动 Agent 进程，二进制路径: ${this.binaryPath}${args.length > 0 ? ` args: ${args.join('')}` : ''}`
-			)
-			this.process = spawn(this.binaryPath, args, {
-				// [0 = stdin（标准输入）,1 = stdout（标准输出）,2 = stderr（标准错误）,3 = 额外的文件描述符，通常用于 IPC]
-				// todo 线上用 ['ignore', 'ignore', 'ignore', 'ipc']
-				stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
-				// todo 通过环境变量控制，本地调试时 detached：false，线上改为 true
+	private async startOnce(args: string[], timeoutMs: number): Promise<void> {
+		if (await hasCompatibleAgent()) return
+		const binaryPath = process.env.MITO_AGENT_BINARY_PATH || getBinaryPath()
+		if (!existsSync(binaryPath)) throw new Error(`Agent binary does not exist: ${binaryPath}`)
+		await new Promise<void>((resolve, reject) => {
+			const child = spawn(binaryPath, args, {
+				// SDK 自动创建的 daemon 不继承终端，避免污染宿主应用输出。
+				stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
 				detached: false,
 				env: {
 					...process.env,
-					// 通过环境变量传递配置
-					MITO_AGENT_TCP_PORT: configMap.get('agentTCPPort').toString(),
+					MITO_AGENT_TCP_PORT: String(configMap.get('agentTCPPort')),
+					MITO_AGENT_HOST: '127.0.0.1',
+					MITO_AGENT_MANAGED: '1',
 				},
 			})
-
-			this.process.on('error', (error) => {
-				reject(new Error(`启动 Agent 失败: ${error.message}`))
-			})
-
-			this.process.on('message', (message: IpcMessage) => {
-				if (message.code === IpcMessageCode.Ok || (message.code === IpcMessageCode.Error && message.message)) {
+			this.process = child
+			let settled = false
+			let readinessPoll: NodeJS.Timeout | null = null
+			let polling = false
+			const timer = setTimeout(() => finish(new Error('Agent startup timeout')), timeoutMs)
+			const finish = (error?: Error) => {
+				if (settled) return
+				settled = true
+				clearTimeout(timer)
+				if (readinessPoll) clearInterval(readinessPoll)
+				child.off('error', onError)
+				child.off('message', onMessage)
+				child.off('exit', onEarlyExit)
+				if (error) {
+					child.kill()
+					this.process = null
+					reject(error)
+				} else {
+					child.unref()
+					child.channel?.unref()
 					resolve()
+				}
+			}
+			const onError = (error: Error) => finish(new Error(`Agent startup failed: ${error.message}`))
+			const onEarlyExit = (code: number | null, signal: NodeJS.Signals | null) =>
+				finish(new Error(`Agent exited before readiness: ${code ?? signal}`))
+			const onMessage = async (message: IpcMessage) => {
+				// 竞争绑定失败的子进程会立即退出，先保留验证现有 daemon 的机会。
+				if (message.message === 'addr_in_use') child.off('exit', onEarlyExit)
+				if (message.code !== IpcMessageCode.Ok && message.message !== 'addr_in_use') {
+					finish(new Error(`Agent startup failed: ${message.message}`))
 					return
 				}
-				logger.error('Agent start error', message.message)
-				reject(new Error(message.message))
-			})
-
-			this.process.on('exit', (code, signal) => {
-				console.log(`Agent 进程退出，代码: ${code}, 信号: ${signal}`)
-				this.process = null
-			})
-
-			// 处理输出
-			this.process.stdout?.on('data', (data) => {
-				// console.log(`[Agent]: ${data.toString().trim()}`)
-			})
-
-			this.process.stderr?.on('data', (data) => {
-				// console.error(`[Agent Error]: ${data.toString().trim()}`)
-			})
-		})
-	}
-
-	/**
-	 * 停止 Agent 进程
-	 */
-	stop(): Promise<void> {
-		return new Promise((resolve) => {
-			if (!this.process) {
-				resolve()
-				return
-			}
-
-			this.process.on('exit', () => {
-				this.process = null
-				resolve()
-			})
-
-			// 尝试优雅关闭
-			this.process.kill('SIGTERM')
-
-			// 5秒后强制关闭
-			setTimeout(() => {
-				if (this.process) {
-					this.process.kill('SIGKILL')
+				try {
+					const ready = await hasCompatibleAgent()
+					if (!ready) {
+						finish(new Error('Agent readiness identity check failed'))
+						return
+					}
+					if (message.code !== IpcMessageCode.Ok) {
+						child.kill()
+						this.process = null
+					}
+					finish()
+				} catch (error) {
+					finish(error as Error)
 				}
-			}, 5000)
+			}
+			child.once('error', onError)
+			child.on('message', onMessage)
+			child.once('exit', onEarlyExit)
+			child.once('exit', () => {
+				if (this.process === child) this.process = null
+			})
+			// Windows Rust 无法使用 Node 的 Unix fd3 IPC，改为轮询同一身份协议确认就绪。
+			// Unix 继续以 IPC 错误为准，不能用轮询掩盖实际启动错误。
+			if (platform() === 'win32') {
+				readinessPoll = setInterval(async () => {
+					if (polling || settled) return
+					polling = true
+					try {
+						if (await hasCompatibleAgent()) finish()
+					} catch (error) {
+						finish(error as Error)
+					} finally {
+						polling = false
+					}
+				}, 50)
+			}
 		})
 	}
-
-	/**
-	 * 获取进程 PID
-	 */
+	// 只停止此管理对象自己创建的进程，不终止复用的 daemon。
+	async stop(): Promise<void> {
+		const child = this.process
+		if (!child) return
+		await new Promise<void>((resolve) => {
+			const timer = setTimeout(() => child.kill('SIGKILL'), 1000)
+			child.once('exit', () => {
+				clearTimeout(timer)
+				this.process = null
+				resolve()
+			})
+			child.kill('SIGTERM')
+		})
+	}
 	getPid(): number | undefined {
 		return this.process?.pid
 	}
-
-	/**
-	 * 判断 Agent 进程是否在运行中
-	 */
 	isRunning(): boolean {
 		return this.process !== null
 	}
 }
-
-/**
- * 创建 Agent 实例（不启动）
- */
 export function createAgent(): MitojsAgent {
 	return new MitojsAgent()
 }
-
-/**
- * 创建并启动 Agent 实例
- */
 export async function initAgent(): Promise<MitojsAgent> {
 	const agent = new MitojsAgent()
 	await agent.start()

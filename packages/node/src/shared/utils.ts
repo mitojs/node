@@ -1,7 +1,8 @@
 import * as http from 'node:http'
 import * as https from 'node:https'
 import os from 'node:os'
-import { setTimeout } from 'node:timers/promises'
+import { clearTimeout as cancelTimeout, setTimeout as scheduleTimeout } from 'node:timers'
+import { setTimeout as delay } from 'node:timers/promises'
 import { URL } from 'node:url'
 import { configMap } from '../config'
 import { logger } from './logger'
@@ -16,9 +17,9 @@ export async function retry<T>(fn: Function, options: RetryOptions = {}): Promis
 		throw new Error('fn is a function')
 	}
 	// @ts-ignore
-	const retry = ~~options.retry || 1
+	const retry = Math.max(0, options.retry ?? 1)
 	// @ts-ignore
-	const delayTime = ~~options.delayTime || 500
+	const delayTime = Math.max(0, options.delayTime ?? 500)
 	let time = 0
 	while (true) {
 		try {
@@ -26,7 +27,7 @@ export async function retry<T>(fn: Function, options: RetryOptions = {}): Promis
 			return result
 		} catch (e) {
 			if (++time <= retry) {
-				await setTimeout(delayTime)
+				await delay(delayTime)
 			} else {
 				throw e
 			}
@@ -39,6 +40,7 @@ export interface FetchOptions {
 	headers?: Record<string, string>
 	body?: string | Buffer
 	timeout?: number
+	signal?: AbortSignal
 }
 
 export interface FetchResponse {
@@ -51,7 +53,7 @@ export interface FetchResponse {
 
 export function easyFetch(url: string, options: FetchOptions = {}): Promise<FetchResponse> {
 	return new Promise((resolve, reject) => {
-		const { method = 'GET', headers = {}, body, timeout = 10000 } = options
+		const { method = 'GET', headers = {}, body, timeout = 1000, signal } = options
 
 		const parsedUrl = new URL(url)
 		const isHttps = parsedUrl.protocol === 'https:'
@@ -64,6 +66,7 @@ export function easyFetch(url: string, options: FetchOptions = {}): Promise<Fetc
 			method,
 			headers,
 			timeout,
+			signal,
 		}
 
 		// 如果是 POST 请求且有 body，设置 Content-Length
@@ -83,7 +86,9 @@ export function easyFetch(url: string, options: FetchOptions = {}): Promise<Fetc
 				data += chunk
 			})
 
+			res.on('error', reject)
 			res.on('end', () => {
+				cancelTimeout(deadline)
 				const response: FetchResponse = {
 					status: res.statusCode || 0,
 					statusText: res.statusMessage || '',
@@ -101,7 +106,11 @@ export function easyFetch(url: string, options: FetchOptions = {}): Promise<Fetc
 			})
 		})
 
+		// socket timeout 只限制空闲时间；持续响应也必须受总耗时上限约束。
+		const deadline = scheduleTimeout(() => req.destroy(new Error('Request timeout')), timeout)
+		deadline.unref?.()
 		req.on('error', (err) => {
+			cancelTimeout(deadline)
 			reject(new Error(`Request failed: ${err.message}`))
 		})
 

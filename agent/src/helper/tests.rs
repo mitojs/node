@@ -98,14 +98,14 @@ fn test_to_user_friendly() {
 fn test_default_tcp_config() {
     let cfg = TcpConfig::default();
     assert_eq!(cfg.port, AGENT_TCP_PORT);
-    assert_eq!(cfg.host, "localhost");
+    assert_eq!(cfg.host, "127.0.0.1");
 }
 
 #[test]
 fn test_default_app_config() {
     let cfg = AppConfig::default();
     assert_eq!(cfg.tcp.port, AGENT_TCP_PORT);
-    assert_eq!(cfg.tcp.host, "localhost");
+    assert_eq!(cfg.tcp.host, "127.0.0.1");
     assert_eq!(cfg.agent_dir, "");
 }
 
@@ -183,4 +183,11 @@ fn test_get_socket_path_named_pipe() {
         "socket path should be a Windows named pipe, got: {}",
         s
     );
+}
+
+#[test]
+fn rejects_non_loopback_listener_configuration() {
+    let mut config = AppConfig::default();
+    config.tcp.host = "0.0.0.0".into();
+    assert!(config.validate().is_err());
 }

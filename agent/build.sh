@@ -44,6 +44,7 @@ readonly BINARY_NAME="mitojs-agent"
 # 目标平台配置 - 使用普通数组替代关联数组以提高兼容性
 TARGET_CONFIGS=(
     "x86_64-pc-windows-gnu:mitojs-agent-win-x64.exe"
+    "x86_64-pc-windows-msvc:mitojs-agent-win-x64.exe"
     "x86_64-unknown-linux-musl:mitojs-agent-linux-x64-musl"
     "aarch64-unknown-linux-musl:mitojs-agent-linux-arm64-musl"
     "x86_64-apple-darwin:mitojs-agent-darwin-x64"
@@ -89,6 +90,15 @@ determine_targets() {
                 else
                     echo "x86_64-unknown-linux-musl"
                 fi
+            elif [[ "$os" == MINGW* || "$os" == MSYS* || "$os" == CYGWIN* ]]; then
+                # Git Bash 下使用已配置的原生 Rust 工具链，保留 SDK 识别的 win-x64 文件名。
+                local host_target=$(rustc -vV | sed -n 's/^host: //p')
+                if [[ "$host_target" == x86_64-pc-windows-* ]]; then
+                    echo "$host_target"
+                else
+                    log_error "仅支持 Windows x64 Rust 工具链" >&2
+                    return 1
+                fi
             else
                 echo ""
             fi
@@ -126,13 +136,25 @@ check_toolchain_dependencies() {
             fi
             ;;
         *"linux-musl")
-            if [[ "$current_os" == "Darwin" ]]; then
-                if ! command -v musl-gcc &> /dev/null; then
-                    log_warning "未找到 musl 交叉编译工具链，跳过 $target 编译"
-                    log_info "请安装: brew install FiloSottile/musl-unix/musl-cross"
-                    return 1
-                fi
+            local machine=$(uname -m)
+            local prefix="${target%%-unknown*}-linux-musl"
+            local linker=""
+            # Linux 原生 musl-tools 提供 musl-gcc；交叉编译使用对应架构的工具链。
+            if [[ "$current_os" == "Linux" && (( "$target" == x86_64-* && "$machine" == "x86_64" ) || ( "$target" == aarch64-* && "$machine" == "aarch64" )) ]] && command -v musl-gcc &> /dev/null; then
+                linker="$(command -v musl-gcc)"
+            elif command -v "${prefix}-gcc" &> /dev/null; then
+                linker="$(command -v "${prefix}-gcc")"
+            elif [[ "$current_os" == "Darwin" && -x "/opt/homebrew/opt/musl-cross/bin/${prefix}-gcc" ]]; then
+                linker="/opt/homebrew/opt/musl-cross/bin/${prefix}-gcc"
+            elif [[ "$current_os" == "Darwin" && -x "/usr/local/opt/musl-cross/bin/${prefix}-gcc" ]]; then
+                linker="/usr/local/opt/musl-cross/bin/${prefix}-gcc"
             fi
+            if [[ -z "$linker" ]]; then
+                log_error "未找到 $target 的 musl 链接器；Linux 原生构建请安装 musl-tools，交叉构建需要 ${prefix}-gcc"
+                return 1
+            fi
+            local linker_env="CARGO_TARGET_$(echo "$target" | tr '[:lower:]-' '[:upper:]_')_LINKER"
+            export "$linker_env=$linker"
             ;;
     esac
     return 0
@@ -160,10 +182,10 @@ compile_target() {
     fi
     
     # 编译
-    if RUSTC=$(rustup which rustc) cargo +stable build --release --target="$target" --bin "$BINARY_NAME"; then
+    if RUSTC=$(rustup which rustc) cargo +stable build --locked --release --target="$target" --bin "$BINARY_NAME"; then
         # 复制二进制文件
         local source_path="target/$target/release/$BINARY_NAME"
-        if [[ "$target" == "x86_64-pc-windows-gnu" ]]; then
+        if [[ "$target" == x86_64-pc-windows-* ]]; then
             source_path="target/$target/release/$BINARY_NAME.exe"
         fi
         
@@ -171,7 +193,10 @@ compile_target() {
         local target_path="$OUTPUT_DIR/$target_name"
         
         if [[ -f "$source_path" ]]; then
-            cp "$source_path" "$target_path"
+            # macOS 会缓存 Mach-O inode 的签名，原地覆盖可能让重建后的程序被 SIGKILL。
+            # 先复制再原子替换，确保执行者始终看到完整的新二进制。
+            cp "$source_path" "$target_path.tmp.$$"
+            mv -f "$target_path.tmp.$$" "$target_path"
             log_success "成功编译: $target_name"
             ls -lh "$target_path"
             return 0
@@ -189,16 +214,20 @@ compile_target() {
 compile_native() {
     log_info "进行本地编译..."
     
-    if cargo +stable build --release --bin "$BINARY_NAME"; then
+    if cargo +stable build --locked --release --bin "$BINARY_NAME"; then
         local source_path="target/release/$BINARY_NAME"
         local target_path="$OUTPUT_DIR/mitojs-agent-native"
         
         if [[ -f "$source_path" ]]; then
-            cp "$source_path" "$target_path"
+            # macOS 会缓存 Mach-O inode 的签名，原地覆盖可能让重建后的程序被 SIGKILL。
+            # 先复制再原子替换，确保执行者始终看到完整的新二进制。
+            cp "$source_path" "$target_path.tmp.$$"
+            mv -f "$target_path.tmp.$$" "$target_path"
             log_success "本地编译成功: mitojs-agent-native"
             return 0
         elif [[ -f "target/release/$BINARY_NAME.exe" ]]; then
-            cp "target/release/$BINARY_NAME.exe" "$OUTPUT_DIR/mitojs-agent-native.exe"
+            cp "target/release/$BINARY_NAME.exe" "$OUTPUT_DIR/mitojs-agent-native.exe.tmp.$$"
+            mv -f "$OUTPUT_DIR/mitojs-agent-native.exe.tmp.$$" "$OUTPUT_DIR/mitojs-agent-native.exe"
             log_success "本地编译成功: mitojs-agent-native.exe"
             return 0
         else
@@ -262,9 +291,9 @@ main() {
     
     for target in "${targets[@]}"; do
         if [[ -n "$target" ]]; then
-            ((total_count++))
+            total_count=$((total_count + 1))
             if compile_target "$target"; then
-                ((success_count++))
+                success_count=$((success_count + 1))
             fi
         fi
     done
@@ -280,4 +309,6 @@ main() {
 }
 
 # 脚本入口
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

@@ -13,36 +13,34 @@
 	"types": "dist/index.d.ts",
 	"exports": {
 		".": {
+			"types": "./dist/index.d.ts",
 			"import": "./dist/index.esm.js",
-			"require": "./dist/index.cjs",
-			"types": "./dist/index.d.ts"
+			"require": "./dist/index.cjs"
 		}
 	},
 	"publishConfig": {
-		"main": "dist/index.cjs",
-		"module": "dist/index.esm.js",
-		"types": "dist/index.d.ts"
+		"access": "public"
 	},
 	"files": [
 		"dist"
 	],
 	"scripts": {
 		"build": "run-s vite-build:esm vite-build:cjs vite-build:bin vite-build:interactive",
-		"watch": "BUILD_TARGET=bin vite build --watch",
-		"vite-build:esm": "BUILD_TARGET=esm vite build",
-		"vite-build:cjs": "BUILD_TARGET=cjs vite build",
-		"vite-build:bin": "BUILD_TARGET=bin vite build",
-		"vite-build:interactive": "BUILD_TARGET=interactive vite build",
-		"lint": "eslint ./src/**",
-		"test": "vitest run"
+		"watch": "node ../../scripts/build-cli.mjs bin --watch",
+		"vite-build:esm": "node ../../scripts/build-cli.mjs esm",
+		"vite-build:cjs": "node ../../scripts/build-cli.mjs cjs",
+		"vite-build:bin": "node ../../scripts/build-cli.mjs bin",
+		"vite-build:interactive": "node ../../scripts/build-cli.mjs interactive",
+		"lint": "biome check src",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
 		"@mitojs/node-shared": "workspace:*",
-		"@types/ink": "2.0.3",
-		"@types/react": "19.0.8",
 		"commander": "^14.0.0",
 		"ink": "6.0.1",
 		"react": "19.1.0",
+		"string-width": "8.3.0",
 		"uuid": "^11.1.0",
 		"ws": "^8.18.3"
 	},
@@ -51,6 +49,10 @@
 		"@types/ws": "^8.18.1",
 		"vite": "^8.0.0",
 		"vite-plugin-dts": "^4.0.0",
-		"vitest": "^4.1.8"
+		"vitest": "^4.1.8",
+		"@types/react": "19.0.8"
+	},
+	"engines": {
+		"node": "^20.19.0 || >=22.12.0"
 	}
 }

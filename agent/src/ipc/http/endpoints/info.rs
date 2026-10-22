@@ -3,7 +3,7 @@ use axum::{
     routing::{get, MethodRouter},
 };
 
-use super::super::common::{BaseResponse, BaseRouter, InfoResponse};
+use super::super::common::{BaseRouter, InfoResponse};
 
 pub struct InfoRouter {
     pub path: &'static str,
@@ -31,6 +31,8 @@ async fn get_info() -> ResponseJson<InfoResponse> {
         name: "mitojs-agent".to_string(),
         version: "0.1.0".to_string(),
         status: "running".to_string(),
+        protocol_version: 1,
+        pid: std::process::id(),
     };
     ResponseJson(info)
 }

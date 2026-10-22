@@ -71,7 +71,7 @@ describe('reportPlugin', () => {
 		const result = await reportPlugin.execute(ctx, {})
 
 		expect(result.success).toBe(true)
-		expect(result.data).toEqual({ filename: '/tmp/test-uuid.json' })
+		expect(result.data).toEqual({ filename: '/tmp/test-uuid.json', source: 'inspector' })
 	})
 
 	it('should propagate error when session.evaluate rejects', async () => {

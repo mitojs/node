@@ -19,9 +19,9 @@ export function takeHeapSnapshot(filename: string): HeapSnapshotResult {
  */
 export function getHeapSnapshotInjectable(filename: string): string {
 	return `
-		const v8 = require('v8');
+		const v8 = process.getBuiltinModule ? process.getBuiltinModule('node:v8') : (typeof require === 'function' ? require('node:v8') : await import('node:v8'));
 		if (typeof v8.writeHeapSnapshot === 'function') {
-			v8.writeHeapSnapshot('${filename}');
+			v8.writeHeapSnapshot(${JSON.stringify(filename)});
 		} else {
 			throw new Error('Node.js version does not support v8.writeHeapSnapshot');
 		}

@@ -1,6 +1,9 @@
 import { registry } from '../core/registry.js'
 import { cpuProfilePlugin } from './cpu-profile.js'
+import { diagnosePlugin } from './diagnose.js'
+import { errorsPlugin } from './errors.js'
 import { heapSnapshotPlugin } from './heap-snapshot.js'
+import { historyPlugin } from './history.js'
 import { memoryPlugin } from './memory.js'
 import { monitorCpuPlugin } from './monitor-cpu.js'
 import { monitorMemoryPlugin } from './monitor-memory.js'
@@ -21,4 +24,7 @@ export function registerBuiltinPlugins() {
 	registry.register(monitorCpuPlugin)
 	registry.register(monitorMemoryPlugin)
 	registry.register(timersPlugin)
+	registry.register(diagnosePlugin)
+	registry.register(historyPlugin)
+	registry.register(errorsPlugin)
 }

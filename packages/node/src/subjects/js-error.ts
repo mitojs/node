@@ -3,7 +3,7 @@ import { JsErrorCollector } from '../collector/js-error'
 import { SubjectNames } from '../shared'
 import { BaseMonitoringSubject } from './base'
 
-export class JSErrorSubject extends BaseMonitoringSubject<Error> {
+export class JSErrorSubject extends BaseMonitoringSubject<any> {
 	protected createCollector(): BaseCollector<Error> {
 		return new JsErrorCollector()
 	}
@@ -16,7 +16,12 @@ export class JSErrorSubject extends BaseMonitoringSubject<Error> {
 	start() {
 		const collector = this.collector as JsErrorCollector
 		collector.subscribe((err: Error) => {
-			this.next(err)
+			this.next({
+				name: err.name || 'Error',
+				message: err.message || String(err),
+				stack: err.stack,
+				timestamp: Date.now(),
+			})
 		})
 	}
 }

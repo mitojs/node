@@ -5,6 +5,14 @@ import type { CPUData } from '../types/metrics'
  * 协议约束：userDiff/systemDiff 单位为微秒，timeDiffMicros 同样为微秒
  */
 export function calculateCpuPercent(userDiff: number, systemDiff: number, timeDiffMicros: number): CPUData {
+	if (
+		![userDiff, systemDiff, timeDiffMicros].every(Number.isFinite) ||
+		userDiff < 0 ||
+		systemDiff < 0 ||
+		timeDiffMicros <= 0
+	) {
+		throw new RangeError('CPU sample time must be positive and usage deltas must be non-negative finite values')
+	}
 	const load = ((userDiff + systemDiff) / timeDiffMicros) * 100
 	const useLoad = (userDiff / timeDiffMicros) * 100
 	return { load, useLoad }
@@ -18,7 +26,7 @@ export function getCpuSnapshotInjectable(): string {
 	return `
 		return {
 			cpuUsage: process.cpuUsage(),
-			hrtime: Number(process.hrtime.bigint())
+			hrtime: String(process.hrtime.bigint())
 		};
 	`
 }

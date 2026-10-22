@@ -8,7 +8,7 @@ export const startInspectPlugin: DiagnosticPlugin = {
 		const session = await ensureSession(ctx)
 		const { url } = await session.evaluate(
 			FUNCTION_WRAPPER(`
-				const { url } = require('inspector');
+				const { url } = process.getBuiltinModule ? process.getBuiltinModule('node:inspector') : (typeof require === 'function' ? require('node:inspector') : await import('node:inspector'));
 				return { url: url() };
 			`)
 		)

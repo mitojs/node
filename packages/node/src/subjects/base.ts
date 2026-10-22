@@ -8,11 +8,14 @@ import { ReactiveSubject } from '../shared/ReactiveSubject'
 export abstract class BaseMonitoringSubject<T> extends ReactiveSubject<T> {
 	protected _interval: number
 	protected _timer: NodeJS.Timeout | null = null
+	protected scheduleInterval: typeof setInterval
 	protected collector: BaseCollector<T> | null = null
 
 	constructor(options?: { interval: number }) {
 		super()
 		this._interval = options?.interval || 5000
+		// 捕获业务定时器包装前的函数，避免 SDK 自己的采样定时器污染业务快照。
+		this.scheduleInterval = global.setInterval
 		this.collector = this.createCollector()
 		this.addTearDown(() => {
 			this.teardown()
@@ -45,12 +48,13 @@ export abstract class BaseMonitoringSubject<T> extends ReactiveSubject<T> {
 			logger.error(`${this.getSubjectName()} start error, subject is closed`)
 			return
 		}
-		this._timer = setInterval(() => {
+		this._timer = this.scheduleInterval(() => {
 			const data = this.collector!.get()
 			if (data) {
 				this.next(data)
 			}
 		}, this._interval)
+		this._timer.unref?.()
 	}
 
 	/**
@@ -58,6 +62,7 @@ export abstract class BaseMonitoringSubject<T> extends ReactiveSubject<T> {
 	 */
 	clearTimer() {
 		this._timer && clearInterval(this._timer)
+		this._timer = null
 	}
 
 	/**
@@ -65,6 +70,7 @@ export abstract class BaseMonitoringSubject<T> extends ReactiveSubject<T> {
 	 */
 	teardown() {
 		this.clearTimer()
+		this.collector?.destroy()
 		this.collector = null
 	}
 }

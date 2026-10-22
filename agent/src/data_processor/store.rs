@@ -4,8 +4,10 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
+#[cfg(test)]
 use strum::{Display, EnumString};
 
+#[cfg(test)]
 #[derive(Debug, Deserialize, Serialize, EnumString, Display)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
@@ -14,6 +16,7 @@ pub enum MetricType {
     Memory,
 }
 
+#[cfg(test)]
 #[derive(Debug, Deserialize, Serialize, EnumString, Display)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
@@ -22,6 +25,7 @@ pub enum ActionType {
     GetMemoryProfile,
 }
 
+#[cfg(test)]
 #[derive(Debug, Deserialize, Serialize, EnumString, Display)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
@@ -30,26 +34,7 @@ pub enum CommandType {
     Metric,
 }
 
-pub struct CpuMetricData {
-    load: f32,
-    user_load: f32,
-}
-
-pub struct MemoryMetricData {
-    memory: u64,
-}
-
-pub struct GetCpuProfileActionData {
-    duration: i32,
-    interval: i32,
-}
-
-pub struct GetMemoryProfileActionData {
-    duration: i32,
-}
-
-// todo 约束 T 和 DataType 的关系
-
+#[cfg(test)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProcessMetricInfo {
     pub process_id: u32,
@@ -59,6 +44,7 @@ pub struct ProcessMetricInfo {
     // data: Box<T>,
 }
 
+#[cfg(test)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ProcessActionInfo {
     pub process_id: u32,
@@ -68,6 +54,7 @@ pub struct ProcessActionInfo {
     // data: Box<T>,
 }
 
+#[cfg(test)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BaseCommandData {
     pub command_type: CommandType,
@@ -94,6 +81,13 @@ impl ProcessMetrics {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TruncatedMetrics {
+    pub errors: u64,
+    pub timers: u64,
+}
+
 #[derive(Debug, Clone)]
 pub struct ProcessStore {
     pub uds_port: u16,
@@ -101,6 +95,9 @@ pub struct ProcessStore {
     pub latest_heartbeat_time: u64,
     pub metrics: ProcessMetrics,
     pub registered_subjects: Vec<String>,
+    pub updated_at: HashMap<String, u64>,
+    pub intervals: HashMap<String, u64>,
+    pub truncated: TruncatedMetrics,
 }
 
 #[derive(Debug)]
@@ -122,10 +119,11 @@ impl Store {
         Self
     }
 
-    pub fn get_data(&self) -> std::sync::MutexGuard<HashMap<u32, ProcessStore>> {
+    pub fn get_data(&self) -> std::sync::MutexGuard<'_, HashMap<u32, ProcessStore>> {
         PROCESS_DATA.lock().unwrap()
     }
 
+    #[cfg(test)]
     pub fn set(&self, key: &u32, value: ProcessStore) -> () {
         PROCESS_DATA.lock().unwrap().insert(*key, value);
     }
@@ -135,42 +133,84 @@ impl Store {
         let old = data.get(key);
 
         if let Some(old) = old {
-            let new = ProcessStore {
+            let mut new = ProcessStore {
                 uds_port: value.uds_port.unwrap_or(old.uds_port),
                 latest_heartbeat_time: value
                     .latest_heartbeat_time
                     .unwrap_or(old.latest_heartbeat_time),
                 metrics: old.metrics.clone(),
                 registered_subjects: old.registered_subjects.clone(),
+                updated_at: old.updated_at.clone(),
+                intervals: old.intervals.clone(),
+                truncated: old.truncated.clone(),
             };
+            // 心跳证明错误监听仍存活，不伪造错误事件，也不修改历史事件时间。
+            if value.latest_heartbeat_time.is_some()
+                && new
+                    .registered_subjects
+                    .iter()
+                    .any(|subject| subject == "JSError")
+            {
+                let now_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
+                new.updated_at.insert("JSError".to_string(), now_ms);
+            }
             data.insert(*key, new);
         }
     }
 
-    pub fn update_metrics(&self, pid: &u32, subject: &str, metric_data: serde_json::Value) {
+    /// 只有显式注册的进程可以推送；迟到请求不能复活已注销的进程。
+    pub fn update_metrics(&self, pid: &u32, subject: &str, metric_data: serde_json::Value) -> bool {
         let mut data = PROCESS_DATA.lock().unwrap();
-        let store = data.entry(*pid).or_insert_with(|| ProcessStore {
-            uds_port: 0,
-            latest_heartbeat_time: 0,
-            metrics: ProcessMetrics::new(),
-            registered_subjects: Vec::new(),
-        });
+        let Some(store) = data.get_mut(pid) else {
+            return false;
+        };
+        let name = match subject {
+            "cpu" | "CPU" => "CPU",
+            "memory" | "Memory" => "Memory",
+            "js_error" | "JSError" => "JSError",
+            "timeout" | "Timeout" => "Timeout",
+            _ => return false,
+        };
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_secs();
+            .as_millis() as u64;
         store.metrics.last_updated = now;
-        match subject {
-            "cpu" | "CPU" => store.metrics.cpu = Some(metric_data),
-            "memory" | "Memory" => store.metrics.memory = Some(metric_data),
-            "js_error" | "JSError" => store.metrics.errors.push(metric_data),
-            "timeout" | "Timeout" => store.metrics.timers.push(metric_data),
-            _ => {}
+        store.updated_at.insert(name.to_string(), now);
+        match name {
+            "CPU" => store.metrics.cpu = Some(metric_data),
+            "Memory" => store.metrics.memory = Some(metric_data),
+            "JSError" => {
+                store.metrics.errors.push(metric_data);
+                if store.metrics.errors.len() > 100 {
+                    store.metrics.errors.remove(0);
+                    store.truncated.errors += 1;
+                }
+            }
+            "Timeout" => {
+                // 定时器是当前快照，空数组必须清空历史，不能追加形成嵌套数组。
+                let timers = metric_data
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_else(|| vec![metric_data]);
+                store.truncated.timers = timers.len().saturating_sub(1000) as u64;
+                store.metrics.timers = timers.into_iter().take(1000).collect();
+            }
+            _ => unreachable!(),
         }
+        true
     }
 
+    #[cfg(test)]
     pub fn get_metrics(&self, pid: &u32) -> Option<ProcessMetrics> {
-        PROCESS_DATA.lock().unwrap().get(pid).map(|s| s.metrics.clone())
+        PROCESS_DATA
+            .lock()
+            .unwrap()
+            .get(pid)
+            .map(|s| s.metrics.clone())
     }
 
     pub fn get(&self, pid: &u32) -> Option<ProcessStore> {
@@ -191,9 +231,7 @@ impl Store {
             .unwrap()
             .as_secs();
         let mut data = PROCESS_DATA.lock().unwrap();
-        data.retain(|_pid, store| {
-            now.saturating_sub(store.latest_heartbeat_time) <= timeout_secs
-        });
+        data.retain(|_pid, store| now.saturating_sub(store.latest_heartbeat_time) <= timeout_secs);
     }
 }
 

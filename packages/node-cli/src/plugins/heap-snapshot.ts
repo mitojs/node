@@ -4,12 +4,13 @@ import { ensureSession, FUNCTION_WRAPPER, genFilename, ok } from '../helper.js'
 
 export const heapSnapshotPlugin: DiagnosticPlugin = {
 	name: 'heapsnapshot',
+	label: '保存堆快照',
 	description: 'get heapsnapshot of the target process',
 	options: [{ flags: '-d, --dir <dir>', description: 'directory to save the snapshot' }],
-	async execute(ctx) {
+	async execute(ctx, options) {
 		const session = await ensureSession(ctx)
-		const filename = genFilename('heapsnapshot')
+		const filename = genFilename('heapsnapshot', options.dir)
 		await session.evaluate(FUNCTION_WRAPPER(getHeapSnapshotInjectable(filename)))
-		return ok({ filename })
+		return ok({ filename }, 'inspector')
 	},
 }

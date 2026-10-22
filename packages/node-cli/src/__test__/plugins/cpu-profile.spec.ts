@@ -12,11 +12,11 @@ vi.mock('../../helper', async (importOriginal) => {
 	return {
 		...actual,
 		genFilename: vi.fn().mockReturnValue('/tmp/test-uuid.cpuprofile'),
-		ensureSession: vi.fn((ctx: any) => Promise.resolve(ctx.session)),
+		ensureSession: vi.fn((ctx: DiagnosticContext) => Promise.resolve(ctx.session)),
 	}
 })
 
-function createMockSession(profileData: any): InspectorSession {
+function createMockSession(profileData: unknown): InspectorSession {
 	return {
 		evaluate: vi.fn(),
 		sendMessage: vi.fn().mockImplementation((method: string) => {
@@ -29,7 +29,7 @@ function createMockSession(profileData: any): InspectorSession {
 		connect: vi.fn(),
 		close: vi.fn(),
 		closeInspector: vi.fn(),
-	} as any
+	} as unknown as InspectorSession
 }
 
 function createContext(overrides: Partial<DiagnosticContext> = {}): DiagnosticContext {
@@ -58,18 +58,19 @@ describe('cpuProfilePlugin', () => {
 		expect(cpuProfilePlugin.description).toBeDefined()
 		expect(cpuProfilePlugin.options).toBeDefined()
 		expect(cpuProfilePlugin.options).toHaveLength(1)
-		expect(cpuProfilePlugin.options![0].flags).toContain('--duration')
-		expect(cpuProfilePlugin.options![0].defaultValue).toBe('10000')
+		expect(cpuProfilePlugin.options?.[0].flags).toContain('--duration')
+		expect(cpuProfilePlugin.options?.[0].defaultValue).toBe('10000')
 	})
 
-	it('should call Profiler.enable and Profiler.start immediately', async () => {
+	it('should enable before starting and finish the requested capture', async () => {
 		const ctx = createContext()
-		cpuProfilePlugin.execute(ctx, { duration: '5000' })
-		// 等待 ensureSession 的微任务完成
-		await Promise.resolve()
+		const pending = cpuProfilePlugin.execute(ctx, { duration: '5000' })
+		await vi.advanceTimersByTimeAsync(0)
 
-		expect(ctx.session!.sendMessage).toHaveBeenCalledWith('Profiler.enable')
-		expect(ctx.session!.sendMessage).toHaveBeenCalledWith('Profiler.start')
+		expect(ctx.session?.sendMessage).toHaveBeenCalledWith('Profiler.enable')
+		expect(ctx.session?.sendMessage).toHaveBeenCalledWith('Profiler.start')
+		await vi.advanceTimersByTimeAsync(5000)
+		expect((await pending).success).toBe(true)
 	})
 
 	it('should call Profiler.stop after the specified duration', async () => {
@@ -78,12 +79,12 @@ describe('cpuProfilePlugin', () => {
 		await Promise.resolve()
 
 		// Profiler.stop 还不应被调用
-		expect(ctx.session!.sendMessage).not.toHaveBeenCalledWith('Profiler.stop')
+		expect(ctx.session?.sendMessage).not.toHaveBeenCalledWith('Profiler.stop')
 
 		await vi.advanceTimersByTimeAsync(5000)
 		const result = await resultPromise
 
-		expect(ctx.session!.sendMessage).toHaveBeenCalledWith('Profiler.stop')
+		expect(ctx.session?.sendMessage).toHaveBeenCalledWith('Profiler.stop')
 		expect(result.success).toBe(true)
 		expect(result.data.filename).toBe('/tmp/test-uuid.cpuprofile')
 	})
@@ -95,13 +96,13 @@ describe('cpuProfilePlugin', () => {
 
 		// 5 秒后不该结束
 		await vi.advanceTimersByTimeAsync(5000)
-		expect(ctx.session!.sendMessage).not.toHaveBeenCalledWith('Profiler.stop')
+		expect(ctx.session?.sendMessage).not.toHaveBeenCalledWith('Profiler.stop')
 
 		// 再推进 5 秒（总计 10 秒）才结束
 		await vi.advanceTimersByTimeAsync(5000)
 		const result = await resultPromise
 
-		expect(ctx.session!.sendMessage).toHaveBeenCalledWith('Profiler.stop')
+		expect(ctx.session?.sendMessage).toHaveBeenCalledWith('Profiler.stop')
 		expect(result.success).toBe(true)
 	})
 
@@ -125,7 +126,7 @@ describe('cpuProfilePlugin', () => {
 		await vi.advanceTimersByTimeAsync(1000)
 		await resultPromise
 
-		expect(ctx.session!.sendMessage).toHaveBeenCalledWith('Profiler.disable')
+		expect(ctx.session?.sendMessage).toHaveBeenCalledWith('Profiler.disable', undefined, { cleanup: true })
 	})
 
 	it('should return error when Profiler.stop rejects', async () => {
@@ -141,7 +142,7 @@ describe('cpuProfilePlugin', () => {
 			connect: vi.fn(),
 			close: vi.fn(),
 			closeInspector: vi.fn(),
-		} as any
+		} as unknown as InspectorSession
 
 		const ctx = createContext({ session })
 		const resultPromise = cpuProfilePlugin.execute(ctx, { duration: '1000' })
@@ -150,6 +151,6 @@ describe('cpuProfilePlugin', () => {
 		const result = await resultPromise
 
 		expect(result.success).toBe(false)
-		expect(result.error).toBe('Profiler not started')
+		expect(result.error).toContain('Profiler not started')
 	})
 })

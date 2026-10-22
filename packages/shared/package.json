@@ -1,7 +1,6 @@
 {
 	"name": "@mitojs/node-shared",
 	"version": "0.0.1",
-	"private": true,
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
@@ -36,11 +35,23 @@
 		}
 	},
 	"scripts": {
-		"build": "tsc -b",
-		"test": "vitest run"
+		"build": "node ../../scripts/build-tsc.mjs .",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage"
 	},
 	"devDependencies": {
 		"@mono/tsconfig": "workspace:*",
 		"vitest": "^4.1.8"
+	},
+	"description": "Shared metric contracts and collection recipes for MitoJS Node",
+	"license": "MIT",
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
+	"engines": {
+		"node": "^20.19.0 || >=22.12.0"
 	}
 }

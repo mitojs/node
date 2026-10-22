@@ -43,6 +43,9 @@ pub async fn heartbeat(
     Json(payload): Json<HeartbeatRequest>,
 ) -> Result<ResponseJson<BaseResponse>, StatusCode> {
     log_print!("/heartbeat {:?}", payload.process_id);
+    if PROCESS_MAP_STORE.get(&payload.process_id).is_none() {
+        return Err(StatusCode::NOT_FOUND);
+    }
     // 更新进程最后的心跳时间
     let secs = SystemTime::now()
         .duration_since(time::UNIX_EPOCH)

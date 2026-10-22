@@ -18,7 +18,7 @@ export function collectMemoryMetrics(): MemoryData {
  */
 export function getMemoryInjectable(): string {
 	return `
-		const v8 = require('v8');
+		const v8 = process.getBuiltinModule ? process.getBuiltinModule('node:v8') : (typeof require === 'function' ? require('node:v8') : await import('node:v8'));
 		return {
 			heapInfo: v8.getHeapStatistics(),
 			heapSpaces: v8.getHeapSpaceStatistics(),

@@ -29,9 +29,9 @@ export class TimeoutSubject extends BaseMonitoringSubject<SerializedTimeoutData>
 		if (this.closed) {
 			return
 		}
-		this._timer = setInterval(() => {
+		this._timer = this.scheduleInterval(() => {
 			const rawData = (this.collector as unknown as TimeoutCollector)?.get()
-			if (rawData && rawData.size > 0) {
+			if (rawData) {
 				const serialized: SerializedTimeoutData = []
 				for (const [id, info] of rawData.entries()) {
 					serialized.push({
@@ -44,5 +44,6 @@ export class TimeoutSubject extends BaseMonitoringSubject<SerializedTimeoutData>
 				this.next(serialized)
 			}
 		}, this._interval)
+		this._timer.unref?.()
 	}
 }

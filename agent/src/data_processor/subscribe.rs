@@ -1,37 +1,19 @@
-use std::sync::Arc;
-
 use crate::{
     data_processor::store::{
         ActionType, BaseCommandData, CommandType, MetricType, ProcessActionInfo, ProcessMetricInfo,
         PROCESS_MAP_STORE,
     },
-    ipc::tcp::DataCallback,
-    {error_print, log_print},
+    log_print,
 };
 
 /// UDS/TCP 数据格式：包含指标值的完整消息
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
 struct MetricMessage {
     process_id: u32,
     metric_type: MetricType,
     #[serde(default)]
     data: Option<serde_json::Value>,
-}
-
-/// 监听 UDS 的数据通信回调
-pub fn data_subscription() -> DataCallback {
-    Arc::new(|data: &str| {
-        if data.trim().is_empty() {
-            return;
-        }
-
-        log_print!("📥 接收到数据: {}", data);
-
-        match process_data(data) {
-            Ok(_) => log_print!("✅ 数据处理成功"),
-            Err(e) => error_print!("❌ 数据处理失败: {}", e),
-        }
-    })
 }
 
 fn process_data(data: &str) -> Result<(), String> {
@@ -80,20 +62,15 @@ fn handle_action(action_info: ProcessActionInfo) -> Result<(), String> {
 
     match action_info.action_type {
         ActionType::GetCpuProfile => {
-            log_print!(
-                "🖥️  收到 CPU Profile 请求: pid={}",
-                action_info.process_id
-            );
-            // TODO: 向对应进程的 Worker Thread 代理发送采集指令
-            Ok(())
+            log_print!("🖥️  收到 CPU Profile 请求: pid={}", action_info.process_id);
+            Err("action dispatch is unsupported; use the Inspector CLI".to_string())
         }
         ActionType::GetMemoryProfile => {
             log_print!(
                 "🧠 收到 Memory Profile 请求: pid={}",
                 action_info.process_id
             );
-            // TODO: 向对应进程的 Worker Thread 代理发送采集指令
-            Ok(())
+            Err("action dispatch is unsupported; use the Inspector CLI".to_string())
         }
     }
 }
@@ -124,16 +101,15 @@ mod tests {
         let json =
             r#"{"command_type":"metric","process_id":42,"metric_type":"cpu","data":{"load":55.2}}"#;
         assert!(process_data(json).is_ok());
-        // 验证数据已写入 Store
+        // 未注册 PID 的旧 IPC 消息不能创建进程。
         let metrics = PROCESS_MAP_STORE.get_metrics(&42);
-        assert!(metrics.is_some());
-        assert!(metrics.unwrap().cpu.is_some());
+        assert!(metrics.is_none());
     }
 
     #[test]
     fn test_process_data_action() {
         let json = r#"{"command_type":"action","process_id":1,"action_type":"get_cpu_profile"}"#;
-        assert!(process_data(json).is_ok());
+        assert!(process_data(json).is_err());
     }
 
     #[test]

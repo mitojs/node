@@ -1,34 +1,57 @@
-.DS_Store
-node_modules
-target
+# Dependencies and package-manager caches
+node_modules/
+.pnpm-store/
 
-# test
-coverage
-.idea
-# analyzer
+# Build outputs and task caches
+dist/
+esm/
+lib/
+target/
+.nx/
+*.tsbuildinfo
+_docpress/
 analyzer.html
 
-packages/*/dist
-packages/*/node_modules
-packages/*/esm
+# Test and coverage outputs
+coverage/
+.nyc_output/
 
-# Coverage directory used by tools like istanbul
-coverage
+# Local development and editor state
+.DS_Store
+.idea/
+.tmp/
+temp/
+.planning/
+.trae/
+.trae.planning/
+__pycache__/
+*.py[cod]
 
-.tmp
-_docpress
+# Local environment files; keep shareable templates
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.sample
+!.env.*.sample
 
-tsconfig.tsbuildinfo
+# Runtime logs and diagnostic artifacts
+*.log
+*.pid
+*.pid.lock
+*.cpuprofile
+*.heapprofile
+*.heapsnapshot
+*.cast
+*.tgz
+report.[0-9]*.json
+# TUI reports saved in the repository root use UUID filenames.
+/????????-????-????-????-????????????.json
+/diagnostics/
+/diagnosis/
+/release-packages/
+/.mito-node/
 
-# output dir
-temp
-dist
-lib
-.nx
-agent/target
-
-# rust
-target/
-
-# trae
-.trae
+# Raw local validation evidence and machine-specific reports.
+# Keep reusable documentation and curated screenshots in docs/ instead.
+/docs/reports/

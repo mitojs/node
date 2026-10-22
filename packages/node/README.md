@@ -1,404 +1,152 @@
 # @mitojs/node
 
-Node.js 应用性能监控 SDK，提供对 CPU 使用率、内存指标、JS 错误和超时异常的实时采集能力。通过 Rust Agent 高性能二进制程序进行 IPC 数据处理，并利用 Worker Thread 隔离代理通信，确保对主线程零阻塞。
+Node.js 进程监控 SDK，采集 CPU、内存、JS 错误和活跃定时器，通过本地 HTTP 上报共享 Rust Agent。人可使用配套 TUI 查看状态，AI Agent 可使用 `mito-node <command> --json` 读取结构化诊断结果。
 
-## 功能特性
+## 安装与要求
 
-- **CPU 监控** — 实时采集进程 CPU 使用率（总负载 + 用户态负载）
-- **内存监控** — 采集堆内存统计、堆空间详情及进程内存使用情况
-- **JS 错误捕获** — 监听 `uncaughtException` 和 `unhandledRejection`，实时上报
-- **超时追踪** — 劫持 `setTimeout`/`setInterval`，追踪调用栈与定时器状态
-- **响应式数据流** — 基于 RxJS Subject 的 Collector/Subject 模式，支持动态订阅与自动 GC
-- **Rust Agent 集成** — 自动启动跨平台预编译 Rust 二进制，通过 IPC（fd 3）通信
-- **Worker Thread 代理** — 独立工作线程运行 HTTP 服务，不阻塞主线程即可与 Agent 交互
-- **跨平台支持** — darwin-arm64、darwin-x64、linux-x64-musl、linux-arm64-musl、win-x64
-
-## 安装
+需要 Node.js `^20.19.0 || >=22.12.0`。发布版本的安装命令：
 
 ```bash
 pnpm add @mitojs/node
 ```
 
-> **前置要求：** Node.js >= 20
+当前仓库实现尚未发布到 npm；体验本轮功能请从仓库根目录使用 pnpm 10.x 和 Rust 工具链构建：
 
-## 快速开始
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+```
 
-```typescript
+SDK 导出支持 ESM `import { MitoNode } from '@mitojs/node'` 和 CommonJS `const { MitoNode } = require('@mitojs/node')`。仅导入包不会自动开始监控。
+
+## 接入应用
+
+```ts
 import { MitoNode } from '@mitojs/node'
 
-const mito = new MitoNode({
-  metrics: {
-    CPU: true,
-    Memory: true,
-    JSError: true,
-  },
+const monitor = new MitoNode({
+	metrics: {
+		CPU: { interval: 1000 },
+		Memory: { interval: 1000 },
+		JSError: true,
+		Timeout: true,
+	},
 })
 
-await mito.start()
+await monitor.start()
+// 启动自己的服务器或其他业务。
+
+// 在应用关闭流程中等待：
+// await monitor.destroy()
 ```
 
-### 订阅监控数据
+一进程只允许一个活动的 `MitoNode`。重复或并发 `start()` 复用同一次启动；失败会 reject 并回滚，可修复配置后重试。`destroy()` 可重复调用并返回 Promise；等待其完成后，可以重新启动。
 
-```typescript
-import { CPUSubject, MemorySubject, JSErrorSubject } from '@mitojs/node'
+启动成功表示已校验 Agent 并注册当前 PID，不表示所有采样立即就绪；首次读取需等待相应采集周期。SDK 内部采样与心跳定时器不会单独维持宿主进程存活。
 
-// CPU 监控
-const cpuSubject = new CPUSubject()
-const subscription = cpuSubject.subscribe((data) => {
-  console.log(`CPU 总负载: ${data.load.toFixed(2)}%`)
-  console.log(`CPU 用户态负载: ${data.useLoad.toFixed(2)}%`)
+## 配置
+
+所有指标默认开启，未指定项保留默认值。禁用某项时明确传 `false`。
+
+| 选项 | 类型 | 默认值 | 行为 |
+| --- | --- | --- | --- |
+| `metrics.CPU` | `boolean \| { interval?: number }` | `true`，5000 ms | 进程 CPU 使用率：用户态与总负载；多核可超过 100% |
+| `metrics.Memory` | `boolean \| { interval?: number }` | `true`，5000 ms | V8 堆统计、各堆空间与 `process.memoryUsage()` |
+| `metrics.JSError` | `boolean` | `true` | 事件驱动的被动错误观察 |
+| `metrics.Timeout` | `boolean` | `true`，5000 ms | 当前活跃 `setTimeout` / `setInterval` 快照与创建位置 |
+
+CPU / Memory 的 `interval` 单位为毫秒，必须是有限正数。Timeout 当前只支持开关，不能通过选项设置采样周期。
+
+例如，只启用 CPU 和内存：
+
+```ts
+const monitor = new MitoNode({
+	metrics: { CPU: true, Memory: true, JSError: false, Timeout: false },
 })
-cpuSubject.start({ interval: 3000 })
-
-// 内存监控
-const memorySubject = new MemorySubject()
-memorySubject.subscribe((data) => {
-  console.log(`堆已用: ${data.heapInfo.used_heap_size}`)
-  console.log(`RSS: ${data.memory.rss}`)
-})
-memorySubject.start()
-
-// JS 错误监控（事件驱动，无需手动 start）
-const jsErrorSubject = new JSErrorSubject()
-jsErrorSubject.subscribe((error) => {
-  console.error('捕获到未处理错误:', error.message)
-})
-
-// 清理资源
-subscription.unsubscribe()
 ```
-
-## 配置选项
-
-### MitoNodeOption
-
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `metrics.CPU` | `boolean` | `true` | 是否启用 CPU 监控 |
-| `metrics.Memory` | `boolean` | `true` | 是否启用内存监控 |
-| `metrics.JSError` | `boolean` | `true` | 是否启用 JS 错误捕获 |
 
 ### 环境变量
 
-| 变量名 | 默认值 | 说明 |
-|--------|--------|------|
-| `MITO_AGENT_TCP_PORT` | `16666` | Rust Agent TCP 通信端口 |
+在创建 SDK 前设置环境变量：
 
-### ConfigType（内部配置）
+| 变量 | 默认值 | 用途 |
+| --- | --- | --- |
+| `MITO_AGENT_TCP_PORT` | `16666` | 本地 Agent HTTP 端口，范围 1–65535；CLI 使用相同的 `--agent-port` |
+| `MITO_AGENT_BINARY_PATH` | 随包平台二进制路径 | 指定可信的 Agent 可执行文件，例如测试或自建产物 |
 
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `agentTCPPort` | `number` | Agent TCP 端口（默认 16666） |
-| `agentHost` | `string` | Agent 主机地址（默认 `localhost`） |
-| `pid` | `number` | 当前进程 PID |
-| `dir` | `string` | 工作目录 |
+SDK 的 Agent 主机固定为 `127.0.0.1`。现有端口上的服务必须通过名称、状态与协议版本校验，普通 HTTP 服务或不兼容 Agent 会导致启动失败。
 
-## 架构设计
+## 生命周期与数据语义
 
-### Collector/Subject 模式
+- **上传**：SDK 直接 HTTP 上报，限制重试、请求时限与每项在途请求；没有 Worker 代理或 16667 代理端口。
+- **共享 Agent**：启动前校验已有服务，多个 Node.js 进程可复用同一个 Agent。SDK 每 30 秒心跳，Agent 重启后恢复注册。
+- **销毁**：停止采样与监听，清理在途上传，注销自己的 PID。定时器恢复只处理自己仍直接持有的包装；后来安装的第三方包装保留，SDK 留在调用链中的中间层停止记录并透明转发。
+- **Agent 退出**：SDK 自动启动的 Agent 在所有注册进程移除后空闲 30 秒退出；不会因某个 SDK 销毁而终止其他进程共享的 Agent。手动启动的 Agent 保持运行。
+- **有界存储**：Agent 最多保留 100 条最近错误；SDK 当前定时器快照最多追踪 1000 个句柄，并返回截断数。已完成的定时器从当前快照移除。
+- **新鲜度**：查询包含每类采样的时间和间隔；健康进程的空错误列表是有效观察，不应解释为连接失败。
 
-系统采用两层抽象实现监控数据采集与分发：
+错误采集使用 `uncaughtExceptionMonitor`，保留 Node 对致命异常及默认未处理拒绝的退出语义。它不负责让崩溃进程继续运行，最后一次异步错误上传也不保证在退出前完成。
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    MitoNode Client                   │
-├─────────────────────────────────────────────────────┤
-│  Subject 层（响应式数据流）                            │
-│  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐  │
-│  │ CPUSubject  │ │MemorySubject │ │JSErrorSubject│  │
-│  └──────┬──────┘ └──────┬───────┘ └──────┬───────┘  │
-│         │               │                │          │
-│  Collector 层（数据采集）                             │
-│  ┌──────┴──────┐ ┌──────┴───────┐ ┌──────┴───────┐  │
-│  │CPUCollector │ │MemoryCollect │ │JsErrorCollect│  │
-│  └─────────────┘ └──────────────┘ └──────────────┘  │
-├─────────────────────────────────────────────────────┤
-│  Worker Thread (HTTP Proxy, port 16667)             │
-├─────────────────────────────────────────────────────┤
-│  Rust Agent (子进程, IPC via fd 3, port 16666)      │
-└─────────────────────────────────────────────────────┘
-```
+## 配合 CLI / TUI
 
-#### BaseCollector\<T\>
-
-抽象基类，定义采集器接口：
-
-- `get(): T | undefined` — 获取当前采集数据（轮询类采集器）
-- `subscribe?(cb)` — 订阅回调（事件驱动类采集器，如 JS Error）
-- `listen?(): () => void` — 启动事件监听（constructor 自动调用），返回清理函数
-- `destroy()` — 释放资源
-
-#### BaseMonitoringSubject\<T\>
-
-继承 `ReactiveSubject<T>`（基于 RxJS Subject），提供定时采集调度：
-
-- `start(options?)` — 启动定时采集（默认间隔 5000ms）
-- `clearTimer()` — 停止定时器
-- `getSubjectName()` — 返回 Subject 名称标识
-- `createCollector()` — 工厂方法，创建对应的 Collector 实例
-
-#### ReactiveSubject\<T\>
-
-增强的 RxJS Subject，支持：
-
-- 自动检测订阅者数量，无订阅者时自动 unsubscribe 并触发 teardown
-- `addTearDown(fn)` — 注册清理回调，在 unsubscribe 时执行
-
-### Worker Thread 代理
-
-代理线程在独立的 Worker Thread 中运行 HTTP 服务（端口 16667），用于：
-
-- 接收 Rust Agent 下发的监控指令
-- 中转主线程与 Agent 之间的通信
-- 完全不阻塞主线程的事件循环
-
-启动流程：
-1. 主线程创建 Worker，传入序列化的配置
-2. Worker 启动 HTTP Server
-3. Worker 通过 `parentPort.postMessage` 通知主线程初始化完成
-4. Worker 设置 `unref()` 不阻止进程退出
-
-### 跨平台二进制管理
-
-`binary.ts` 负责平台检测与 Rust Agent 生命周期管理：
-
-| 平台 | 二进制名称 |
-|------|-----------|
-| macOS ARM64 | `mitojs-agent-darwin-arm64` |
-| macOS x64 | `mitojs-agent-darwin-x64` |
-| Linux x64 | `mitojs-agent-linux-x64-musl` |
-| Linux ARM64 | `mitojs-agent-linux-arm64-musl` |
-| Windows x64 | `mitojs-agent-win32-x64.exe` |
-
-Agent 进程管理：
-- 通过 `spawn` 启动子进程，使用 `stdio: ['inherit', 'inherit', 'inherit', 'ipc']` 配置 fd 3 进行 IPC
-- 支持优雅关闭（SIGTERM）和强制终止（5s 超时后 SIGKILL）
-- 通过环境变量 `MITO_AGENT_TCP_PORT` 传递端口配置
-
-## API 文档
-
-### MitoNode
-
-主入口类，初始化并启动监控系统。
-
-```typescript
-class MitoNode {
-  constructor(options?: MitoNodeOption)
-  start(): Promise<void>
-  destroy(): void
-}
-```
-
-### 采集器（Collectors）
-
-#### CPUCollector
-
-```typescript
-class CPUCollector extends BaseCollector<CPUData> {
-  get(): CPUData
-}
-
-interface CPUData {
-  load: number    // CPU 总负载（%），包含用户态 + 系统态
-  useLoad: number // CPU 用户态负载（%）
-}
-```
-
-#### MemoryCollector
-
-```typescript
-class MemoryCollector extends BaseCollector<MemoryData> {
-  get(): MemoryData
-}
-
-interface MemoryData {
-  heapInfo: HeapInfo           // V8 堆统计信息
-  heapSpaces: HeapSpaceInfo[]  // V8 各堆空间详情
-  memory: NodeJS.MemoryUsage   // 进程内存使用（rss, heapTotal, heapUsed, external）
-}
-```
-
-#### JsErrorCollector
-
-```typescript
-class JsErrorCollector extends BaseCollector<Error> {
-  subscribe(cb: (err: Error) => void): void
-}
-```
-
-事件驱动型采集器，监听 `uncaughtException` 和 `unhandledRejection`。
-
-#### TimeoutCollector
-
-```typescript
-class TimeoutCollector extends BaseCollector<TimeoutData> {
-  get(): TimeoutData
-}
-
-type TimeoutData = Map<number, {
-  name: 'setTimeout' | 'setInterval'
-  stack: string  // 调用栈路径
-  timer: Timer
-}>
-```
-
-通过 shimmer 模式劫持全局 `setTimeout`/`setInterval`，追踪所有定时器的创建位置。
-
-### Subject（响应式主题）
-
-#### CPUSubject
-
-```typescript
-class CPUSubject extends BaseMonitoringSubject<CPUData> {
-  getSubjectName(): SubjectNames.CPU
-}
-```
-
-#### MemorySubject
-
-```typescript
-class MemorySubject extends BaseMonitoringSubject<MemoryData> {
-  getSubjectName(): SubjectNames.Memory
-}
-```
-
-#### JSErrorSubject
-
-```typescript
-class JSErrorSubject extends BaseMonitoringSubject<Error> {
-  getSubjectName(): SubjectNames.JSError
-  start(): void  // 无操作 — 错误通过事件监听实时通知
-}
-```
-
-### MitojsAgent
-
-Rust Agent 进程管理：
-
-```typescript
-class MitojsAgent {
-  start(args?: string[]): Promise<void>
-  stop(): Promise<void>
-  getPid(): number | undefined
-}
-
-function initAgent(): Promise<MitojsAgent>
-```
-
-### Config
-
-泛型配置管理：
-
-```typescript
-class Config<T> {
-  get<K extends keyof T>(key?: K): T[K] | T | null
-  set(data: T): void
-  update(data: Partial<T>): void
-  destroy(): void
-}
-```
-
-## 目录结构
-
-```
-packages/node/
-├── binaries/                  # 预编译 Rust Agent 二进制文件
-│   ├── mitojs-agent-darwin-arm64
-│   ├── mitojs-agent-darwin-x64
-│   ├── mitojs-agent-linux-arm64-musl
-│   ├── mitojs-agent-linux-x64-musl
-│   └── mitojs-agent-win32-x64.exe
-├── src/
-│   ├── __test__/              # 单元测试
-│   │   ├── collector/
-│   │   │   ├── cpu.spec.ts
-│   │   │   ├── jsError.spec.ts
-│   │   │   └── timeout.spec.ts
-│   │   └── binary.spec.ts
-│   ├── collector/             # 数据采集器
-│   │   ├── base.ts           # BaseCollector 抽象基类
-│   │   ├── cpu.ts            # CPU 使用率采集
-│   │   ├── memory.ts         # 内存指标采集
-│   │   ├── js-error.ts       # JS 错误捕获
-│   │   ├── timeout.ts        # 定时器追踪
-│   │   └── index.ts
-│   ├── subjects/              # 响应式监控主题
-│   │   ├── base.ts           # BaseMonitoringSubject 基类
-│   │   ├── cpu.ts            # CPU Subject
-│   │   ├── memory.ts         # Memory Subject
-│   │   ├── js-error.ts       # JSError Subject
-│   │   └── index.ts
-│   ├── shared/                # 共享工具
-│   │   ├── constants.ts      # 常量定义（端口、枚举）
-│   │   ├── ReactiveSubject.ts # 响应式 Subject（RxJS 增强）
-│   │   ├── http.ts           # HTTP 服务创建
-│   │   ├── shimmer.ts        # Monkey-patch 工具（wrap/unwrap）
-│   │   ├── stack.ts          # 调用栈解析
-│   │   ├── logger.ts         # 日志工具
-│   │   ├── is.ts             # 环境检测
-│   │   └── utils.ts          # 通用工具函数
-│   ├── proxy_thread/          # Worker Thread 代理
-│   │   └── index.ts          # HTTP 代理服务主入口
-│   ├── binary.ts             # Rust Agent 进程管理
-│   ├── client.ts             # MitoNode 客户端
-│   ├── config.ts             # 配置管理
-│   ├── init.ts               # 初始化逻辑
-│   ├── types.ts              # 类型定义
-│   ├── request.ts            # 请求工具
-│   └── index.ts              # 包入口
-├── dist/                      # 构建产物
-├── package.json
-├── tsconfig.json
-└── jest.config.cjs
-```
-
-## 开发指南
-
-### 构建
+安装包含当前功能的 CLI 版本后，在另一个终端运行；将 `12345` 替换为自己应用的 PID：
 
 ```bash
-# 安装依赖
-pnpm install
-
-# TypeScript 编译
-pnpm --filter @mitojs/node esm
-
-# 监听模式
-pnpm --filter @mitojs/node watch:esm
-
-# 完整构建（含 Rust Agent 编译）
-pnpm --filter @mitojs/node build
-
-# 仅构建 Rust Agent
-pnpm --filter @mitojs/node build:rust
+mito-node --interactive
+mito-node memory --pid 12345 --json
+mito-node timers --pid 12345 --json
+mito-node errors --pid 12345 --json
+mito-node diagnose --pid 12345 --duration 6000 --scenario all --dir ./diagnosis --json
 ```
 
-### 测试
+从源码使用时，将 `mito-node` 替换为 `node packages/node-cli/dist/cli.mjs`，命令相对于仓库根目录执行。
+
+错误、定时器需要对应 SDK 采集项及新鲜 Agent 数据；CPU / 内存可在 Agent 数据缺失或过期时通过 Inspector 获取。默认采样周期下，组合诊断观察至少 6 秒，才有机会取得两个不同时间的快照。两点变化只描述窗口内现象，不能单独证明内存或定时器泄漏。
+
+Inspector 诊断会校验 PID 并管理连接所有权；自定义目标 Inspector 端口时传 `--port`。仅对自己拥有的开发 / 调试进程使用诊断与代码执行功能。
+
+## 单独订阅采样
+
+SDK 也导出 Subject，适合需要自己消费数据的场景。单独创建的 Subject 不会自动注册或上传到 Agent：
+
+```ts
+import { CPUSubject } from '@mitojs/node'
+
+const cpu = new CPUSubject({ interval: 1000 })
+const subscription = cpu.subscribe((sample) => {
+	console.log(`进程 CPU: ${sample.load.toFixed(1)}%`)
+})
+cpu.start()
+
+// 在关闭流程中取消订阅；最后一个订阅释放时会停止采样并清理 collector。
+// subscription.unsubscribe()
+```
+
+Subject 关闭后需要创建新实例，不能把已关闭实例重新当作活动采集器使用。对于事件型 `JSErrorSubject`，同样需要先订阅再调用 `start()` 连接事件分发。
+
+## 构建与测试
+
+在仓库根目录执行：
 
 ```bash
-# 运行本包测试
-pnpm --filter @mitojs/node test
-
-# 运行所有包测试
-pnpm test
+pnpm --filter @mitojs/node esm           # 仅 SDK TypeScript，清理旧产物后编译
+pnpm --filter @mitojs/node watch:esm     # TypeScript 监听模式
+pnpm build:rust                        # 当前平台 Agent
+pnpm build                             # shared、SDK、CLI 与 Rust Agent
+pnpm --filter @mitojs/node test         # Vitest 单测
+pnpm --filter @mitojs/node test:coverage # V8 覆盖率
+cargo test --locked --manifest-path agent/Cargo.toml
 ```
 
-测试框架：Jest + ts-jest，测试文件匹配 `**/*.spec.ts`。
+源码入口位于 `src/client.ts`；采集器在 `src/collector/`，Subject 在 `src/subjects/`，HTTP 请求与平台二进制管理分别在 `src/request.ts`、`src/binary.ts`。测试使用 Vitest，格式化与 Lint 使用 Biome。
 
-### 代码风格
+## 当前验证范围
 
-- 格式化工具：Biome（非 ESLint）
-- 缩进：Tab，宽度 2
-- 引号：单引号
-- 分号：按需（asNeeded）
-- 行宽：120
+2026-10-22 已在 Darwin ARM64、真实 Node 20.19.0 / 22.22.2 上完成源码构建、干净安装和 SDK / CLI 联调；SDK 49 项单测通过，行覆盖率 81.39%。
 
-### 依赖
+源码与发布流水线的目标包括 darwin-arm64、darwin-x64、linux-x64-musl、linux-arm64-musl、win-x64；Windows 文件名为 `mitojs-agent-win-x64.exe`。其余四个平台当前仓库二进制仍为历史产物，公开发布前必须运行五平台新构建与 manifest 校验，不能把本地验证当作全平台验证。
 
-| 依赖 | 用途 |
-|------|------|
-| `rxjs` | 响应式数据流（Subject/Observable） |
-| `deepmerge` | 深度合并用户配置 |
+高频定时器场景 CPU 配对增量中位数为 2.11 个单核百分点，包含 Agent 后 RSS 增量中位数为 12.01 MiB；这些只是当前样例测量结果，不承诺固定开销上限。测量方法、结果摘要和功能自测范围见[仓库验证说明](../../docs/validation.md)。
 
 ## 许可证
 

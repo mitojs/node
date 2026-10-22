@@ -9,16 +9,6 @@ pub struct IpcMessage {
     pub message: String,
 }
 
-#[cfg(target_os = "macos")]
-fn get_ipc_path() -> &'static str {
-    "/dev/fd/3"
-}
-
-#[cfg(target_os = "linux")]
-fn get_ipc_path() -> &'static str {
-    "/proc/self/fd/3"
-}
-
 /// Windows 不支持 /dev/fd/3 或 /proc/self/fd/3，使用 stdout 作为 IPC 通道的回退方案
 #[cfg(target_os = "windows")]
 fn write_message_for_ipc(message: IpcMessage) -> io::Result<()> {
@@ -29,17 +19,24 @@ fn write_message_for_ipc(message: IpcMessage) -> io::Result<()> {
     Ok(())
 }
 
-/// Unix 系统（macOS/Linux）通过 fd3 文件描述符进行 IPC 通信
-#[cfg(not(target_os = "windows"))]
+/// 直接复制继承的 socket FD，避免 Linux 将 /proc/self/fd 路径重新 open 时失败。
+#[cfg(unix)]
+fn write_message_to_fd(message: IpcMessage, fd: std::os::fd::RawFd) -> io::Result<()> {
+    use std::os::fd::FromRawFd;
+    // dup 返回的新描述符由此 File 独占，Drop 只关闭副本，不会关闭 Node 继承的 IPC 通道。
+    let duplicate = unsafe { libc::dup(fd) };
+    if duplicate < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let mut file = unsafe { std::fs::File::from_raw_fd(duplicate) };
+    let serialized = serde_json::to_string(&message)?;
+    writeln!(file, "{}", serialized)?;
+    file.flush()
+}
+
+#[cfg(unix)]
 fn write_message_for_ipc(message: IpcMessage) -> io::Result<()> {
-    use std::fs::OpenOptions;
-    let message = serde_json::to_string(&message)?;
-    let mut file = OpenOptions::new().write(true).open(get_ipc_path())?;
-    writeln!(file, "{}", message)?;
-    file.flush()?;
-    // 不要让 file 被 drop，否则会关闭文件描述符
-    std::mem::forget(file);
-    Ok(())
+    write_message_to_fd(message, 3)
 }
 
 pub fn send_ipc_message(message: IpcMessage) {
@@ -72,13 +69,47 @@ mod tests {
         assert_eq!(json_err["code"], 500);
         assert_eq!(json_err["message"], "failed");
     }
+}
+
+#[cfg(all(test, unix))]
+mod inherited_socket_tests {
+    use super::*;
+    use std::io::{BufRead, BufReader};
+    use std::os::fd::AsRawFd;
+    use std::os::unix::net::UnixStream;
 
     #[test]
-    #[cfg(not(target_os = "windows"))]
-    fn test_get_ipc_path() {
-        let path = get_ipc_path();
-        assert!(!path.is_empty());
-        // macOS: /dev/fd/3, Linux: /proc/self/fd/3
-        assert!(path.contains("fd/3"));
+    fn writes_json_lines_to_an_inherited_socket_without_closing_the_original() {
+        let (writer, reader) = UnixStream::pair().unwrap();
+        for message in ["first", "second"] {
+            write_message_to_fd(
+                IpcMessage {
+                    code: IpcMessageCode::Ok,
+                    message: message.into(),
+                },
+                writer.as_raw_fd(),
+            )
+            .unwrap();
+        }
+        let mut reader = BufReader::new(reader);
+        for expected in ["first", "second"] {
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            let json: serde_json::Value = serde_json::from_str(&line).unwrap();
+            assert_eq!(json["code"], 200);
+            assert_eq!(json["message"], expected);
+        }
+    }
+
+    #[test]
+    fn invalid_inherited_descriptor_returns_an_io_error() {
+        assert!(write_message_to_fd(
+            IpcMessage {
+                code: IpcMessageCode::Ok,
+                message: "ready".into()
+            },
+            -1
+        )
+        .is_err());
     }
 }

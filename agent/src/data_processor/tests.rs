@@ -1,8 +1,8 @@
 use serial_test::serial;
 
 use super::store::{
-    ActionType, CommandType, MetricType, PartialProcessStore, ProcessMetrics, ProcessStore,
-    Store, PROCESS_DATA,
+    ActionType, CommandType, MetricType, PartialProcessStore, ProcessMetrics, ProcessStore, Store,
+    PROCESS_DATA,
 };
 
 fn clear_store() {
@@ -15,6 +15,9 @@ fn make_store_entry(uds_port: u16, heartbeat: u64) -> ProcessStore {
         latest_heartbeat_time: heartbeat,
         metrics: ProcessMetrics::new(),
         registered_subjects: Vec::new(),
+        updated_at: Default::default(),
+        intervals: Default::default(),
+        truncated: Default::default(),
     }
 }
 
@@ -111,6 +114,7 @@ fn test_store_update_nonexistent() {
 fn test_update_metrics_cpu() {
     clear_store();
     let store = Store::new();
+    store.set(&1, make_store_entry(0, 1));
     store.update_metrics(&1, "cpu", serde_json::json!({"usage": 50.5}));
 
     let m = store.get_metrics(&1).unwrap();
@@ -123,6 +127,7 @@ fn test_update_metrics_cpu() {
 fn test_update_metrics_memory() {
     clear_store();
     let store = Store::new();
+    store.set(&1, make_store_entry(0, 1));
     store.update_metrics(&1, "memory", serde_json::json!({"rss": 1024}));
 
     let m = store.get_metrics(&1).unwrap();
@@ -135,7 +140,12 @@ fn test_update_metrics_memory() {
 fn test_update_metrics_js_error() {
     clear_store();
     let store = Store::new();
-    store.update_metrics(&1, "js_error", serde_json::json!({"message": "ReferenceError"}));
+    store.set(&1, make_store_entry(0, 1));
+    store.update_metrics(
+        &1,
+        "js_error",
+        serde_json::json!({"message": "ReferenceError"}),
+    );
     store.update_metrics(&1, "js_error", serde_json::json!({"message": "TypeError"}));
 
     let m = store.get_metrics(&1).unwrap();
@@ -149,7 +159,12 @@ fn test_update_metrics_js_error() {
 fn test_update_metrics_timeout() {
     clear_store();
     let store = Store::new();
-    store.update_metrics(&1, "timeout", serde_json::json!({"fn": "setTimeout", "ms": 5000}));
+    store.set(&1, make_store_entry(0, 1));
+    store.update_metrics(
+        &1,
+        "timeout",
+        serde_json::json!({"fn": "setTimeout", "ms": 5000}),
+    );
 
     let m = store.get_metrics(&1).unwrap();
     assert_eq!(m.timers.len(), 1);
@@ -161,6 +176,7 @@ fn test_update_metrics_timeout() {
 fn test_update_metrics_unknown_subject() {
     clear_store();
     let store = Store::new();
+    store.set(&1, make_store_entry(0, 1));
     store.update_metrics(&1, "unknown_subject", serde_json::json!({"x": 1}));
 
     let m = store.get_metrics(&1).unwrap();
@@ -172,13 +188,13 @@ fn test_update_metrics_unknown_subject() {
 
 #[test]
 #[serial]
-fn test_update_metrics_auto_creates_store() {
+fn test_update_metrics_requires_registration() {
     clear_store();
     let store = Store::new();
-    // pid 42 不存在，update_metrics 应自动创建
+    // 未注册进程的迟到推送必须丢弃
     assert!(store.get(&42).is_none());
     store.update_metrics(&42, "cpu", serde_json::json!({"usage": 10}));
-    assert!(store.get(&42).is_some());
+    assert!(store.get(&42).is_none());
 }
 
 #[test]
@@ -188,6 +204,7 @@ fn test_get_metrics() {
     let store = Store::new();
     assert!(store.get_metrics(&1).is_none());
 
+    store.set(&1, make_store_entry(0, 1));
     store.update_metrics(&1, "cpu", serde_json::json!({"usage": 75}));
     let m = store.get_metrics(&1);
     assert!(m.is_some());
@@ -293,4 +310,33 @@ fn test_cleanup_expired_removes_zero_heartbeat() {
     store.cleanup_expired(300);
 
     assert!(store.get(&1).is_none(), "心跳为 0 的条目应被清理");
+}
+
+#[test]
+#[serial]
+fn rejects_late_metrics_after_unregister() {
+    clear_store();
+    let store = Store::new();
+    store.update_metrics(&42, "CPU", serde_json::json!({"load": 5}));
+    assert!(
+        store.get(&42).is_none(),
+        "late pushes must not revive an unregistered PID"
+    );
+}
+
+#[test]
+#[serial]
+fn replaces_timer_snapshot_and_bounds_error_history() {
+    clear_store();
+    let store = Store::new();
+    store.set(&42, make_store_entry(0, 1));
+    store.update_metrics(&42, "Timeout", serde_json::json!([{"id":1},{"id":2}]));
+    store.update_metrics(&42, "Timeout", serde_json::json!([]));
+    assert!(store.get_metrics(&42).unwrap().timers.is_empty());
+    for n in 0..105 {
+        store.update_metrics(&42, "JSError", serde_json::json!({"message": n}));
+    }
+    let metrics = store.get_metrics(&42).unwrap();
+    assert_eq!(metrics.errors.len(), 100);
+    assert_eq!(metrics.errors[0]["message"], 5);
 }
