@@ -1,12 +1,10 @@
 import { Box, Text, useApp, useInput, useStdout } from 'ink'
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import stringWidth from 'string-width'
 import type { TuiController, TuiState } from './controller.js'
 import {
 	actions,
-	chart,
-	chartValues,
 	clip,
-	cpuSamples,
 	fieldLabels,
 	filterProcesses,
 	formatMetric,
@@ -16,14 +14,16 @@ import {
 	resultLines,
 	wrapLines,
 } from './model.js'
+import { trendChart } from './trend.js'
 
 interface Line {
 	text: string
-	tone?: 'accent' | 'warning' | 'danger' | 'muted' | 'good'
+	tone?: 'accent' | 'memory' | 'warning' | 'danger' | 'muted' | 'good'
+	spans?: { text: string; tone?: Line['tone'] }[]
 	bold?: boolean
 	selected?: boolean
 }
-const tones = { accent: 'cyan', warning: 'yellow', danger: 'red', muted: '#aab4c0', good: 'green' }
+const tones = { accent: 'cyan', memory: '#c084fc', warning: 'yellow', danger: 'red', muted: '#aab4c0', good: 'green' }
 const tabs = [
 	{ id: 'overview', label: '总览' },
 	{ id: 'cpu', label: 'CPU' },
@@ -54,7 +54,7 @@ function helpLines(): Line[] {
 		{ text: '' },
 		{ text: 'CPU 100% 约等于一个逻辑 CPU 的时间；多核可超过 100%。' },
 		{ text: 'RSS 为进程驻留内存；Heap 为 V8 JS 堆，不等于进程全部内存。' },
-		{ text: '图中 · 是缺失或过期样本，不能解释为 0。图表按实际峰值缩放。' },
+		{ text: '曲线连接实际样本，缺失处留空；两图同为最近 60 秒，纵轴分别缩放。' },
 		{ text: '错误和定时器需要 SDK 与 Agent；未连接时显示“暂无数据”。' },
 		{ text: '取消只停止本次等待，部分目标操作可能仍在完成。' },
 	]
@@ -206,30 +206,64 @@ function errorTable(state: TuiState): Line[] {
 	return lines
 }
 
-function cpuGraph(state: TuiState, now: number, width: number, height = 4): Line[] {
-	const history = state.samples
-	const values = cpuSamples(history)
-		.filter((sample) => (sample.cpuAt ?? sample.at) > now - 60000)
-		.flatMap((sample) => (sample.cpu === null ? [] : [sample.cpu]))
-	const maximum = Math.max(100, ...values)
-	const points = chartValues(history, 'cpu', now, Math.max(8, Math.min(60, width - 9)))
+function metricGraph(
+	state: TuiState,
+	metric: 'cpu' | 'rss' | 'heapUsed',
+	now: number,
+	width: number,
+	height: number
+): Line[] {
+	const cpu = metric === 'cpu'
+	const tone = metric === 'rss' ? 'memory' : 'accent'
+	const number = (value: number) => (cpu ? value : value / 1024 / 1024).toFixed(1)
+	const scale = trendChart(state.samples, metric, now, 0, 0)
+	const axisStep = (scale.max - scale.min) / (cpu ? 1 : 1024 * 1024) / Math.max(1, height - 1)
+	const axisDigits = Math.min(4, Math.max(1, -Math.floor(Math.log10(axisStep))))
+	const axisLabel = (value: number) => (cpu ? value : value / 1024 / 1024).toFixed(axisDigits)
+	// 微小内存变化会增加刻度小数位，先预留实际标签宽度再生成网格，避免折行错位。
+	const axisWidth = Math.max(7, axisLabel(scale.min).length, axisLabel(scale.max).length)
+	const plotWidth = Math.max(1, width - axisWidth - 1)
+	const trend = trendChart(state.samples, metric, now, plotWidth, height)
+	const stat = (value: number | null) => (value === null ? '—' : `${number(value)}${cpu ? '%' : ''}`)
 	const rows: Line[] = [
+		{ text: cpu ? 'CPU 使用率 (%)' : metric === 'rss' ? '内存 RSS (MiB)' : 'Heap 已用 (MiB)', tone, bold: true },
 		{
-			text: `CPU 使用率（最近 60 秒） ${values.length ? `样本均值 ${(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1)}%` : '等待有效样本'}`,
-			tone: 'accent',
+			text: clip(`现${stat(trend.current)} 均${stat(trend.average)} 峰${stat(trend.peak)}`, width),
+			tone: trend.current === null ? 'muted' : tone,
 		},
 	]
-	for (let row = height - 1; row >= 0; row--) {
-		const label = `${Math.round((maximum * row) / Math.max(1, height - 1))}%`.padStart(5)
-		rows.push({
-			text: `${label} │${points
-				.map((value) => (value === null ? ' ' : (value / maximum) * (height - 1) >= row ? '•' : ' '))
-				.join('')}`,
-			tone: 'accent',
-		})
+	for (const [index, row] of trend.rows.entries()) {
+		const value = trend.max - ((trend.max - trend.min) * index) / Math.max(1, height - 1)
+		const label = axisLabel(value)
+		rows.push({ text: `${label.padStart(axisWidth)}│${row}`, tone })
 	}
-	rows.push({ text: `      60s${' '.repeat(Math.max(1, points.length - 9))}现在`, tone: 'muted' })
+	rows.push({ text: `${' '.repeat(axisWidth)}└${'─'.repeat(plotWidth)}`, tone: 'muted' })
+	const gap = Math.max(0, plotWidth - 12)
+	rows.push({
+		text: `${' '.repeat(axisWidth)} -60s${' '.repeat(Math.floor(gap / 2))}-30s${' '.repeat(Math.ceil(gap / 2))}现在`,
+		tone: 'muted',
+	})
 	return rows
+}
+
+function pairedGraphs(state: TuiState, now: number, width: number, height: number): Line[] {
+	const leftWidth = Math.floor((width - 2) / 2)
+	const rightWidth = width - leftWidth - 2
+	const memory = state.workspaceTab === 'memory'
+	const left = metricGraph(state, memory ? 'rss' : 'cpu', now, leftWidth, height)
+	const right = metricGraph(state, memory ? 'heapUsed' : 'rss', now, rightWidth, height)
+	// 固定列宽将两条时间轴对齐；分别着色，避免把不同量纲误读为同一纵轴。
+	return left.map((line, index) => {
+		const leftText = line.text + ' '.repeat(Math.max(0, leftWidth - stringWidth(line.text)))
+		return {
+			text: `${leftText}  ${right[index].text}`,
+			spans: [
+				{ text: `${leftText}  `, tone: line.tone },
+				{ text: right[index].text, tone: right[index].tone },
+			],
+			bold: line.bold,
+		}
+	})
 }
 
 function overviewLines(state: TuiState, now: number, width: number, height: number): Line[] {
@@ -263,22 +297,6 @@ function overviewLines(state: TuiState, now: number, width: number, height: numb
 			tone: 'warning',
 		})
 	const tab = state.workspaceTab ?? 'overview'
-	if (tab === 'cpu')
-		return [
-			...lines,
-			...cpuGraph(state, now, width, Math.max(3, Math.min(7, height - 10))),
-			{ text: observed.detail },
-			{ text: 'CPU 100% 约为一个逻辑 CPU；多核可超过 100%。', tone: 'muted' },
-			{ text: 'Enter 设置 CPU Profile；具体函数需要采样证据。', tone: 'muted' },
-		]
-	if (tab === 'memory')
-		return [
-			...lines,
-			{ text: 'RSS 趋势（最近 60 秒）', tone: 'accent' },
-			{ text: chart(state.samples, 'rss', now, Math.min(60, width)) },
-			{ text: 'RSS 为进程驻留内存；Heap 为 V8 JS 堆。短时增加不能确认泄漏。', tone: 'muted' },
-			{ text: 'Enter 查看内存详情；可从任务列表保存堆快照。', tone: 'muted' },
-		]
 	if (tab === 'errors')
 		return [...errorTable(state), { text: 'Enter 获取完整错误列表；结果中 X 展开堆栈。', tone: 'muted' }]
 	if (tab === 'timers')
@@ -288,12 +306,34 @@ function overviewLines(state: TuiState, now: number, width: number, height: numb
 			{ text: 'Enter 获取完整定时器列表与创建堆栈。', tone: 'muted' },
 		]
 	if (tab === 'artifacts') return artifactLines(state)
-	return [
-		...lines,
-		...cpuGraph(state, now, width, height >= 22 ? 6 : 3),
-		...errorTable(state),
-		{ text: `当前任务: ${actions[state.actionIndex].label} · Tab 切换区域`, tone: 'muted' },
-	]
+	if (lines.length + 7 > height) lines.splice(3, 1)
+	let tail: Line[]
+	if (tab === 'cpu')
+		tail = [
+			{ text: observed.detail },
+			{ text: 'CPU 100% 约为一个逻辑 CPU；多核可超过 100%。', tone: 'muted' },
+			{ text: 'Enter 设置 CPU Profile；具体函数需要采样证据。', tone: 'muted' },
+		]
+	else if (tab === 'memory')
+		tail = [
+			{ text: 'RSS 为进程驻留内存；Heap 为 V8 JS 堆。', tone: 'muted' },
+			{ text: '短时增加不能确认泄漏；Enter 查看内存详情。', tone: 'muted' },
+		]
+	else {
+		const errors = errorTable(state)
+		const room = Math.max(0, height - lines.length - 8)
+		tail = [
+			...errors.slice(0, room),
+			{ text: `当前任务: ${actions[state.actionIndex].label} · Tab 切换区域`, tone: 'muted' },
+		]
+	}
+	// 小窗口优先保留两张完整图和坐标，说明文字随剩余行数收缩。
+	tail = tail.slice(0, Math.max(0, height - lines.length - 7)).map((line) => ({
+		...line,
+		text: clip(line.text, width),
+	}))
+	const plotHeight = Math.max(3, Math.min(8, height - lines.length - tail.length - 4))
+	return [...lines, ...pairedGraphs(state, now, width, plotHeight), ...tail]
 }
 
 function taskLines(state: TuiState): Line[] {
@@ -348,7 +388,9 @@ function taskLines(state: TuiState): Line[] {
 }
 
 function wrapped(lines: Line[], width: number): Line[] {
-	return lines.flatMap((line) => wrapLines([line.text], width).map((text) => ({ ...line, text })))
+	return lines.flatMap((line) =>
+		wrapLines([line.text], width).map((text) => ({ ...line, text, spans: text === line.text ? line.spans : undefined }))
+	)
 }
 
 function viewport(lines: Line[], height: number, state: TuiState, focused = true) {
@@ -360,7 +402,7 @@ function viewport(lines: Line[], height: number, state: TuiState, focused = true
 }
 
 function focusedPane(state: TuiState, columns: number, rows: number, now: number) {
-	const wide = columns >= 120
+	const wide = columns >= 120 && rows >= 26
 	const area = state.workspaceArea ?? 'overview'
 	const special = state.step === 'select' || state.help
 	const width =
@@ -398,7 +440,8 @@ export function TuiView({ state, columns, rows, now, noColor }: ViewProps) {
 			</Box>
 		)
 	const color = (tone: Line['tone']) => (!noColor && tone ? tones[tone] : undefined)
-	const wide = columns >= 120
+	// 短宽窗口也使用紧凑布局，为两张图和时间轴保留足够行数。
+	const wide = columns >= 120 && rows >= 26
 	const sample = state.samples.at(-1)
 	const expired = sample ? isExpired(sample, now) : false
 	const age = sample ? sample.ageMs + Math.max(0, now - sample.at) : null
@@ -419,7 +462,13 @@ export function TuiView({ state, columns, rows, now, noColor }: ViewProps) {
 					bold={line.bold || line.selected}
 					wrap='truncate-end'
 				>
-					{line.text || ' '}
+					{line.spans
+						? line.spans.map((span, spanIndex) => (
+								<Text key={`${spanIndex}:${span.tone}`} color={color(span.tone)}>
+									{span.text}
+								</Text>
+							))
+						: line.text || ' '}
 				</Text>
 			))}
 		</Box>

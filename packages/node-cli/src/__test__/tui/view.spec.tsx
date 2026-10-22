@@ -1,4 +1,5 @@
 import { cleanup, render } from 'ink-testing-library'
+import stringWidth from 'string-width'
 import { afterEach, describe, expect, it } from 'vitest'
 import { InteractiveApp, TuiView } from '../../tui/app.js'
 import type { TuiState } from '../../tui/controller.js'
@@ -48,6 +49,78 @@ const state = (patch: Partial<TuiState> = {}): TuiState => ({
 })
 
 describe('guided terminal rendering', () => {
+	it.each([
+		{ columns: 70, rows: 20 },
+		{ columns: 80, rows: 24 },
+		{ columns: 120, rows: 20 },
+		{ columns: 160, rows: 24 },
+		{ columns: 120, rows: 36 },
+		{ columns: 160, rows: 40 },
+	])('shows CPU and memory line charts together without scrolling at $columns×$rows', ({ columns, rows }) => {
+		const samples = [30000, 40000, 50000, 60000].map((at) => ({
+			...state().samples[0],
+			at,
+			cpuAt: at,
+			memoryAt: at,
+			cpuIntervalMs: 10000,
+			memoryIntervalMs: 10000,
+			cpu: 0.1,
+			rss: 64 * 1024 * 1024,
+		}))
+		const ui = render(<TuiView state={state({ samples })} columns={columns} rows={rows} now={60000} noColor />)
+		const screen = ui.lastFrame() ?? ''
+		expect(screen).toContain('CPU 使用率 (%)')
+		expect(screen).toContain('内存 RSS (MiB)')
+		expect(screen).toContain('0.1%')
+		expect(screen).toContain('64.0')
+		expect(screen).not.toContain('•')
+		expect(screen.match(/-60s/g)).toHaveLength(2)
+		expect(screen.match(/现在/g)).toHaveLength(2)
+		expect(screen.split('\n').length).toBeLessThan(rows)
+		for (const line of screen.split('\n')) expect(stringWidth(line)).toBeLessThanOrEqual(columns)
+	})
+	it.each(['cpu', 'memory'] as const)('keeps multiple metric charts visible on the %s tab', (workspaceTab) => {
+		const ui = render(<TuiView state={state({ workspaceTab })} columns={80} rows={24} now={10000} noColor />)
+		const screen = ui.lastFrame() ?? ''
+		expect(screen).toContain('内存 RSS (MiB)')
+		expect(screen).toContain(workspaceTab === 'cpu' ? 'CPU 使用率 (%)' : 'Heap 已用 (MiB)')
+		expect(screen).not.toContain('•')
+	})
+	it('keeps both time axes visible with collection warnings in the minimum terminal size', () => {
+		const current = state()
+		current.samples[0] = {
+			...current.samples[0],
+			failure: 'Agent data temporarily unavailable',
+			errorsDropped: 3,
+			timersDropped: 2,
+		}
+		const ui = render(<TuiView state={current} columns={70} rows={20} now={10000} noColor />)
+		const screen = ui.lastFrame() ?? ''
+		expect(screen).toContain('采集提示')
+		expect(screen).toContain('记录截断')
+		expect(screen.match(/现在/g)).toHaveLength(2)
+		expect(screen).not.toContain('PgUp/PgDn 滚动')
+	})
+	it('uses distinct axis labels for low CPU usage', () => {
+		const current = state()
+		current.samples[0] = { ...current.samples[0], cpu: 0.1 }
+		const ui = render(<TuiView state={current} columns={80} rows={24} now={10000} noColor />)
+		const screen = ui.lastFrame() ?? ''
+		expect(screen).toContain('0.10│')
+		expect(screen).toContain('0.05│')
+		expect(screen).toContain('0.00│')
+	})
+	it('keeps both plots aligned when memory changes by only one page', () => {
+		const samples = [1000, 2000].map((at, index) => ({
+			...state().samples[0],
+			at,
+			rss: 100 * 1024 * 1024 + index * 4096,
+		}))
+		const ui = render(<TuiView state={state({ samples })} columns={160} rows={40} now={2000} noColor />)
+		const lines = (ui.lastFrame() ?? '').split('\n')
+		const title = lines.findIndex((line) => line.includes('CPU 使用率 (%)'))
+		for (const line of lines.slice(title + 2, title + 10)) expect(line.match(/\d+\.\d+│/g)).toHaveLength(2)
+	})
 	it.each([120, 80])(
 		'uses arrow keys to choose a task immediately after entering the %s-column dashboard',
 		async (columns) => {
@@ -427,15 +500,16 @@ it('keeps the running task fixed while navigation keys are pressed and cancels t
 	expect(controller.getSnapshot().result).toMatchObject({ command: 'cpuprofile', errorCode: 'CANCELLED' })
 })
 
-it('plots an actual 80-percent CPU sample on the 80-percent grid rather than quantizing it down twice', () => {
+it('keeps precise CPU measurements visible alongside the line chart', () => {
 	const current = state()
-	current.samples[0] = { ...current.samples[0], cpu: 80 }
+	current.samples[0] = { ...current.samples[0], cpu: 80.125 }
 	const ui = render(<TuiView state={current} columns={120} rows={36} now={10000} noColor />)
-	const eighty = ui
-		.lastFrame()
-		?.split('\n')
-		.find((line) => line.includes('80% │'))
-	expect(eighty).toContain('•')
+	const screen = ui.lastFrame() ?? ''
+	expect(screen).toContain('现80.1%')
+	expect(screen).toContain('均80.1%')
+	expect(screen).toContain('峰80.1%')
+	expect(screen).toContain('CPU 使用率 (%)')
+	expect(screen).not.toContain('•')
 })
 
 it('shows a saved Profile path and viewing guidance alongside a cleanup failure', () => {

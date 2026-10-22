@@ -13,6 +13,51 @@ import sys
 import tempfile
 import termios
 import time
+import unicodedata
+
+
+def current_screen(data, columns, rows):
+    """Apply the terminal adapter's cursor updates, rather than matching historical output."""
+    grid = [[" "] * columns for _ in range(rows - 1)]
+    row, column = 0, 0
+    for token in re.findall(r"\x1b\[[0-?]*[ -/]*[@-~]|[^\x1b]", data.decode("utf8", "replace")):
+        if token.startswith("\x1b["):
+            command = token[-1]
+            values = token[2:-1]
+            parameters = [int(value) if value else 1 for value in values.split(";")] if not values.startswith("?") else []
+            if command in ("H", "f"):
+                row = max(0, (parameters[0] if parameters else 1) - 1)
+                column = max(0, (parameters[1] if len(parameters) > 1 else 1) - 1)
+            elif command == "K" and row < len(grid):
+                mode = int(values or 0)
+                start = 0 if mode in (1, 2) else column
+                end = min(columns, column + 1) if mode == 1 else columns
+                grid[row][start:end] = [" "] * max(0, end - start)
+            elif command == "J" and values in ("2", "3"):
+                grid = [[" "] * columns for _ in range(rows - 1)]
+            # SGR, cursor visibility, and synchronized-update markers do not change cells.
+            continue
+        if token == "\r":
+            column = 0
+        elif token == "\n":
+            row += 1
+        elif token == "\b":
+            column = max(0, column - 1)
+        elif ord(token) >= 32:
+            if unicodedata.combining(token):
+                if row < len(grid) and 0 < column <= columns:
+                    grid[row][column - 1] += token
+                continue
+            width = 2 if unicodedata.east_asian_width(token) in ("W", "F") else 1
+            if column >= columns:
+                column = 0
+                row += 1
+            if row < len(grid) and column + width <= columns:
+                grid[row][column] = token
+                if width == 2:
+                    grid[row][column + 1] = ""
+            column += width
+    return ["".join(line).rstrip() for line in grid]
 
 node, root = sys.argv[1:3]
 with tempfile.TemporaryDirectory(prefix="mito-terminal-test-") as directory:
@@ -88,6 +133,30 @@ with tempfile.TemporaryDirectory(prefix="mito-terminal-test-") as directory:
         pump(2)
         steady = bytes(output[offset:])
         observed = text()
+        chart_views = {}
+        for columns, rows in [(120, 36), (80, 24)]:
+            # The adapter redraws all rows on a geometry change. Replay only bytes
+            # written after this resize, so the previous wide frame cannot satisfy it.
+            resize_offset = len(output)
+            fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", rows, columns, 0, 0))
+            os.kill(child.pid, signal.SIGWINCH)
+            deadline = time.monotonic() + 2
+            viewport = {}
+            while time.monotonic() < deadline:
+                pump(.05)
+                viewports = (evidence / "viewport.jsonl").read_text().splitlines()
+                viewport = json.loads(viewports[-1]) if viewports else {}
+                screen = current_screen(bytes(output[resize_offset:]), columns, rows)
+                frame = "\n".join(screen)
+                if (viewport.get("columns"), viewport.get("rows")) == (columns, rows) and (
+                    "CPU 使用率 (%)" in frame and "内存 RSS (MiB)" in frame
+                    and frame.count("60s") == 2 and frame.count("现在") == 2
+                ):
+                    break
+            chart_views[f"{columns}x{rows}"] = {
+                "columns": viewport.get("columns"), "rows": viewport.get("rows"),
+                "screen": current_screen(bytes(output[resize_offset:]), columns, rows)
+            }
         # A separate owned target shares the configured port but has no SDK.
         # Switching must use its Inspector data, never the preselected demo's Agent data.
         second_target = subprocess.Popen([
@@ -126,6 +195,7 @@ with tempfile.TemporaryDirectory(prefix="mito-terminal-test-") as directory:
             "exitCode": child.returncode,
             "targetExitCode": final.get("targetExitCode"),
             "keyboardTasks": keyboard_tasks,
+            "chartViews": chart_views,
             "switchedToInspector": "来源 inspector" in switched and ("PID " + str(second_target.pid)) in switched
         }))
     finally:

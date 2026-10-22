@@ -12,6 +12,12 @@ export interface DashboardSample {
 	at: number
 	cpuAt?: number
 	memoryAt?: number
+	cpuIntervalMs?: number
+	memoryIntervalMs?: number
+	cpuSource?: string
+	memorySource?: string
+	cpuStale?: boolean
+	memoryStale?: boolean
 	cpu: number | null
 	rss: number | null
 	heapUsed: number | null
@@ -175,8 +181,16 @@ export function buildSample(
 	const memoryData = memory.success && memory.data && typeof memory.data === 'object' ? memory.data : {}
 	const sources = [...new Set([cpuData.source, memoryData.source].filter(Boolean))]
 	const metricMeta = (data: Record<string, unknown>, subject: 'CPU' | 'Memory', success: boolean) => {
-		const sampledAt = data.sampledAt ?? info?.updatedAt?.[subject] ?? info?.updatedAt?.[subject.toLowerCase()]
-		const interval = data.interval ?? info?.intervals?.[subject] ?? info?.intervals?.[subject.toLowerCase()] ?? 1000
+		// Inspector 回退是独立的新采样，不能继承旧 SDK 缓存的采集时间。
+		const sampledAt =
+			data.sampledAt ??
+			(data.source === 'agent' ? (info?.updatedAt?.[subject] ?? info?.updatedAt?.[subject.toLowerCase()]) : undefined)
+		const interval =
+			data.interval ??
+			(data.source === 'agent'
+				? (info?.intervals?.[subject] ?? info?.intervals?.[subject.toLowerCase()])
+				: undefined) ??
+			1000
 		const validInterval = typeof interval === 'number' && Number.isFinite(interval) && interval > 0 ? interval : 1000
 		const sampledTime = typeof sampledAt === 'number' && Number.isFinite(sampledAt) ? sampledAt : undefined
 		return {
@@ -196,6 +210,13 @@ export function buildSample(
 		at: now,
 		cpuAt: cpuMeta.at,
 		memoryAt: memoryMeta.at,
+		// 两类采集器可能使用不同来源和频率，趋势图不能用一个过期标记截断所有指标。
+		cpuIntervalMs: cpuMeta.interval,
+		memoryIntervalMs: memoryMeta.interval,
+		cpuSource: typeof cpuMeta.source === 'string' ? cpuMeta.source : undefined,
+		memorySource: typeof memoryMeta.source === 'string' ? memoryMeta.source : undefined,
+		cpuStale: !cpu.success || cpuMeta.stale,
+		memoryStale: !memory.success || memoryMeta.stale,
 		cpu: numberOrNull(cpuData.cpuPercent),
 		rss: numberOrNull(memoryData.rss),
 		heapUsed: numberOrNull(memoryData.heapUsed),

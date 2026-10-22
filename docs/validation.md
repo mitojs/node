@@ -4,7 +4,7 @@
 
 ## 功能验证
 
-2026-10-22 完成 SDK、Rust Agent、CLI 与 C 版 TUI 的本地联调，并补齐闪屏、任务方向键与 PID 切换回归。源码提交前的检查命令：
+2026-10-23 完成 SDK、Rust Agent、CLI 与 C 版 TUI 的本地联调，并补齐闪屏、任务方向键、PID 切换与同屏趋势图回归。源码提交前的检查命令：
 
 ```bash
 pnpm build
@@ -16,14 +16,16 @@ cargo test --locked --manifest-path agent/Cargo.toml
 
 | 检查 | 已通过的用例 |
 | --- | ---: |
-| TypeScript 包内单测 | 241（shared 19 / SDK 49 / CLI 173） |
+| TypeScript 包内单测 | 279（shared 19 / SDK 49 / CLI 211） |
 | 构建与包装工具测试 | 11 |
 | Rust Agent | 81 |
-| 构建 CLI E2E | 18 |
+| 构建 CLI E2E | 20 |
 
-真实 Unix PTY 回归覆盖自动选择 demo PID、CPU / 内存 / 错误 / 定时器数据、方向键选择任务与参数字段、P 切换到另一个自建进程后的 Inspector 数据源、增量重绘和退出清理。UI 单测另覆盖 120 / 80 列布局、结果滚动与下一任务。
+真实 Unix PTY 回归覆盖自动选择 demo PID、CPU / 内存 / 错误 / 定时器数据、方向键选择任务与参数字段、P 切换到另一个自建进程后的 Inspector 数据源、增量重绘和退出清理；120×36 与 80×24 下重建当前终端网格，确认 CPU、RSS 曲线及两条时间轴同屏可见。UI 单测另覆盖 70×20、120×20 短宽窗口、低 CPU 刻度、内存微小波动、结果滚动与下一任务。
 
-工作台改为只更新变化的行；相同示例负载下，240×68 终端的 3 秒稳定窗口，输出从 877416 字节降至 17795 字节，整行擦除序列从 2720 次降至 0 次。这是一次终端输出样本，不代表 SDK 的 CPU 性能基准。
+工作台改为只更新变化的行。2026-10-22 的闪屏修复样本中，相同示例负载下，240×68 终端的 3 秒稳定窗口，输出从 877416 字节降至 17795 字节，整行擦除序列从 2720 次降至 0 次。这是当时单张 CPU 图的终端输出样本，不代表双图的输出量或 SDK 的 CPU 性能基准。
+
+趋势图按原始采样时间对齐最近 60 秒，连续段中每列取最后一个真实样本绘图，避免密集采样在同一列反复形成竖刺；均值与峰值仍包含全部唯一时间戳的样本。低 CPU 自动缩放，各指标独立判断过期；缺失、来源切换或明显超出采样周期时断线，末样本之后不补线。
 
 README 中保留了[宽屏工作台](assets/tui/workbench-120x36.png)、[紧凑布局](assets/tui/workbench-80x24.png)与[组合诊断](assets/tui/diagnosis-result.png)三张实际会话画面。图片由真实 PTY 输出经 VT 单元格渲染得到，不是原生窗口截图。
 
@@ -46,4 +48,5 @@ SDK 的 Windows HTTP 就绪用例曾在并行负载下触发 500ms 超时。该�
 - 保留源码、测试及必要 fixture、demo、构建与发布脚本、锁文件、仓库原有 SDK 平台二进制。
 - 保留维护文档与 `docs/assets/` 中经挑选的展示图片。
 - 忽略 `.planning/`、`.tmp/`、`docs/reports/`、构建缓存、覆盖率、日志、CPU Profile、Heap Snapshot、终端回放与本地环境配置。
+- `.vscode/` 只保留共享的 `launch.json`、`tasks.json` 和 `settings.json`；本机 Agent 配置、缓存、`logs/`、`recordings/` 及 Rust 二进制原子替换临时文件不入库。
 - `.gitignore` 不影响 CI 生成和上传 artifacts，也不会删除本地验证数据。

@@ -18,6 +18,7 @@ describe.skipIf(process.platform === 'win32' || python.status !== 0)('real termi
 		targetExitCode: number
 		switchedToInspector: boolean
 		keyboardTasks: boolean
+		chartViews: Record<string, { columns: number; rows: number; screen: string[] }>
 	}
 	beforeAll(() => {
 		const root = path.resolve(import.meta.dirname, '../../../../..')
@@ -45,5 +46,20 @@ describe.skipIf(process.platform === 'win32' || python.status !== 0)('real termi
 	})
 	it('selects right-side tasks with arrows and then moves through parameter fields in the real terminal', () => {
 		expect(result.keyboardTasks).toBe(true)
+	})
+	it.each([
+		[120, 36],
+		[80, 24],
+	])('keeps both metric charts and their time axes visible after resizing to %sx%s', (columns, rows) => {
+		const view = result.chartViews?.[`${columns}x${rows}`]
+		expect(view, 'the live PTY must capture a fresh frame at the requested dimensions').toBeDefined()
+		const screen = view?.screen.join('\n') ?? ''
+		expect(screen).toContain('CPU 使用率 (%)')
+		expect(screen).toContain('内存 RSS (MiB)')
+		expect(screen.match(/60s/g)).toHaveLength(2)
+		expect(screen.match(/现在/g)).toHaveLength(2)
+		expect(view?.columns).toBe(columns)
+		expect(view?.rows).toBe(rows)
+		expect(view?.screen.length).toBeLessThanOrEqual(rows - 1)
 	})
 })
