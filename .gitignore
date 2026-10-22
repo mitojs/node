@@ -19,7 +19,16 @@ coverage/
 # Local development and editor state
 .DS_Store
 .idea/
+# Keep only the shared editor build, debug and formatting configuration.
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+.codex/
+.claude/settings.local.json
+.cache/
 .tmp/
+/tmp/
 temp/
 .planning/
 .trae/
@@ -37,6 +46,7 @@ __pycache__/
 
 # Runtime logs and diagnostic artifacts
 *.log
+logs/
 *.pid
 *.pid.lock
 *.cpuprofile
@@ -51,6 +61,9 @@ report.[0-9]*.json
 /diagnosis/
 /release-packages/
 /.mito-node/
+/recordings/
+# Rust builds replace release binaries atomically; interrupted copies are local.
+/packages/node/binaries/*.tmp.*
 
 # Raw local validation evidence and machine-specific reports.
 # Keep reusable documentation and curated screenshots in docs/ instead.
