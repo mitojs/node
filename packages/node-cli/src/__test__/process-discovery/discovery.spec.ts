@@ -199,11 +199,15 @@ it('discovers a real owned Node child with its complete fixture marker', async (
 	children.push(child)
 	if (!child.stdout) throw new Error('Fixture stdout unavailable')
 	await once(child.stdout, 'data')
-	const processes = getNodeProcesses({ run: (file, args, options) => execFileSync(file, args, options) })
+	// 真实进程字段校验不测冷启动延迟；Windows 共享 runner 的首次 CIM 查询可能超过交互查询预算。
+	// 超时与权限失败仍由上方独立用例验证，生产查询继续使用自己的时间限制。
+	const processes = getNodeProcesses({
+		run: (file, args, options) => execFileSync(file, args, { ...options, timeout: 30000 }),
+	})
 	const discovered = processes.find((proc) => proc.pid === child.pid)
 	expect(discovered).toMatchObject({ pid: child.pid, ppid: process.pid })
 	expect(discovered?.command).toContain(marker)
-}, 10000)
+}, 40000)
 
 it('requests UTF-8 from PowerShell so native stdout encoding cannot corrupt Chinese commands', () => {
 	const found = getNodeProcesses({
