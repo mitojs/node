@@ -137,14 +137,9 @@ Inspector 按需连接并校验目标 PID；自动诊断结束后关闭本次启
 
 ## 架构
 
-```mermaid
-flowchart LR
-	App[Node.js 应用中的 SDK] -->|HTTP 指标与心跳| Agent[Rust Agent · 127.0.0.1:16666]
-	CLI[共享诊断执行器] -->|优先读取新鲜采样| Agent
-	CLI -->|按需 CDP WebSocket| App
-	TUI[人使用的 TUI] --> CLI
-	JSON[AI Agent 使用的 JSON CLI] --> CLI
-```
+![MitoJS Node 当前组件与部署架构](docs/assets/architecture/current.svg)
+
+[查看架构说明与源码索引](docs/architecture.html) · [SVG 原图](docs/assets/architecture/current.svg) · [PNG 图片](docs/assets/architecture/current.png)
 
 SDK 的 Collector / Subject 负责采集和分发，直接通过 HTTP 上传，不再经过 Worker 代理。Agent 保存每类指标的时间、间隔与截断数：最多 100 条错误与 1000 个当前定时器。SDK 每 30 秒心跳；自动创建的共享 Agent 在没有注册进程后空闲 30 秒退出，手动启动的 Agent 保持运行。
 

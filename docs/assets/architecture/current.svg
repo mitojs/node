@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1260" viewBox="0 0 1800 1260" role="img" aria-labelledby="arch-title arch-desc">
+  <title id="arch-title">MitoJS Node 当前架构</title>
+  <desc id="arch-desc">组件与部署架构。目标 Node.js 应用内嵌 SDK，并提供独立的 Inspector 端点。SDK 通过 HTTP 向 Rust Agent 守护进程上报指标。诊断 CLI 内的人机 TUI 与机器 JSON 接口共用诊断内核，分别通过 AgentClient 和 InspectorSession 访问 Agent 与目标应用。共享包是 SDK 和 CLI 的代码依赖，诊断产物与历史保存在本地文件系统。</desc>
+  <defs>
+    <marker id="arrow" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#87867f"/></marker>
+    <marker id="arrow-http" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#637749"/></marker>
+    <marker id="arrow-cdp" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#b85c3e"/></marker>
+  </defs>
+  <style>
+    text{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;fill:#141413;font-size:20px}
+    .serif{font-family:Georgia,'Songti SC','Noto Serif CJK SC',serif}
+    .mono{font-family:Menlo,Consolas,monospace}
+    .muted{fill:#68675f}.small{font-size:17px}.tiny{font-size:15px}.label{font-size:19px;font-weight:600}.heading{font-size:25px;font-weight:600}
+    .boundary{fill:#f0eee6;stroke:#c6c3b8;stroke-width:1.5}.node{fill:white;stroke:#d1cfc5;stroke-width:1.5}.mask{fill:white;stroke:#d1cfc5;stroke-width:1}
+    .http-text{fill:#52643e}.cdp-text{fill:#b85c3e}
+    .edge{fill:none;stroke:#87867f;stroke-width:1.8;marker-end:url(#arrow)}
+    .http{fill:none;stroke:#637749;stroke-width:2.2;marker-end:url(#arrow-http)}
+    .cdp{fill:none;stroke:#b85c3e;stroke-width:2.4;marker-end:url(#arrow-cdp)}
+    .lifecycle{stroke-dasharray:7 6}.component{outline:none}
+  </style>
+  <rect width="1800" height="1260" fill="#faf9f5"/>
+  <text x="48" y="67" class="serif" style="font-size:42px">MitoJS Node · 当前架构</text>
+  <text x="48" y="109" class="muted" style="font-size:21px">进程边界、组件职责与接口依赖</text>
+  <text x="1752" y="65" text-anchor="end" class="mono small muted">mitojs/node · dev @ 08bb018</text>
+  <text x="1752" y="102" text-anchor="end" class="small muted">代码快照：2026-10-23 · 本机诊断架构</text>
+  <path d="M48 136H1752" stroke="#d1cfc5"/>
+
+  <!-- Runtime boundaries carry deployment meaning; library and storage ownership are separate below. -->
+  <rect x="48" y="244" width="488" height="672" rx="14" class="boundary"/>
+  <rect x="664" y="320" width="416" height="480" rx="14" class="boundary"/>
+  <rect x="1200" y="244" width="552" height="672" rx="14" class="boundary"/>
+  <rect x="72" y="228" width="252" height="34" rx="5" class="mask"/>
+  <text x="88" y="251" class="label">目标应用进程 · Node.js</text>
+  <rect x="688" y="304" width="300" height="34" rx="5" class="mask"/>
+  <text x="704" y="327" class="label">共享守护进程 · Rust Agent</text>
+
+  <!-- All connectors denote dependencies or interfaces, without temporal ordering. -->
+  <path d="M1348 220V324" class="edge"/>
+  <path d="M1604 220V324" class="edge"/>
+  <path d="M1348 452V500" class="edge"/>
+  <path d="M1604 452V500" class="edge"/>
+  <path d="M1348 692V740" class="edge"/>
+  <path d="M1604 692V740" class="edge"/>
+  <path d="M504 432H688" class="http"/>
+  <path d="M1232 800H1148V472H1056" class="http"/>
+  <path d="M872 508V560" class="edge"/>
+  <path d="M504 574H584V852H872V808" class="edge lifecycle"/>
+  <path d="M1604 856V968H292V900" class="cdp"/>
+  <path d="M1720 916V1028" class="edge"/>
+  <rect x="1224" y="228" width="308" height="34" rx="5" class="mask"/>
+  <text x="1240" y="251" class="label">诊断 CLI 进程 · mito-node</text>
+
+  <text x="1348" y="181" text-anchor="middle" class="heading">开发者</text>
+  <text x="1348" y="210" text-anchor="middle" class="small muted">终端交互</text>
+  <text x="1604" y="181" text-anchor="middle" class="heading">AI Agent / 自动化</text>
+  <text x="1604" y="210" text-anchor="middle" class="small muted">命令调用</text>
+  <text x="80" y="292" class="small muted">业务应用 · SDK 在目标主线程内运行</text>
+
+  <g class="component" data-component="sdk">
+    <rect x="80" y="332" width="424" height="284" rx="10" class="node"/>
+    <text x="104" y="374" class="mono heading">@mitojs/node</text>
+    <text x="104" y="414">MitoNode · 生命周期 / 配置</text>
+    <path d="M104 434H480" stroke="#e3dacc"/>
+    <text x="104" y="466" class="label">Collectors + RxJS Subjects</text>
+    <text x="104" y="501" class="small">CPU · Memory · JSError · Timeout</text>
+    <path d="M104 522H480" stroke="#e3dacc"/>
+    <text x="104" y="555" class="label">HTTP 上报 + Agent 二进制管理</text>
+    <text x="104" y="588" class="small muted">每类指标限制在途请求 · 心跳恢复注册</text>
+  </g>
+  <text x="80" y="654" class="small muted">错误 / 定时器依赖 SDK 的持续采集</text>
+  <g class="component" data-component="inspector">
+    <rect x="80" y="704" width="424" height="188" rx="10" class="node"/>
+    <text x="104" y="746" class="heading">Node.js Inspector</text>
+    <text x="104" y="782">Node / V8 内建调试端点 · 按需启用</text>
+    <text x="104" y="820" class="mono small muted">Runtime · Profiler · HeapProfiler</text>
+    <text x="104" y="864" class="small muted">Inspector 诊断能力可独立于 SDK 使用</text>
+  </g>
+
+  <g class="component" data-component="agent-api">
+    <rect x="696" y="376" width="352" height="132" rx="10" class="node"/>
+    <text x="720" y="416" style="font-size:23px;font-weight:600">HTTP API · axum / tokio</text>
+    <text x="720" y="452" class="mono">127.0.0.1:16666</text>
+    <text x="720" y="485" class="mono tiny muted">/info · /ipc/* · /metrics/*</text>
+  </g>
+  <g class="component" data-component="agent-store">
+    <rect x="696" y="568" width="352" height="156" rx="10" class="node"/>
+    <text x="720" y="608" style="font-size:23px;font-weight:600">进程指标内存存储</text>
+    <text x="720" y="643">按 PID 分区 · 4 类指标</text>
+    <text x="720" y="676" class="small">采样时间 / 间隔 / 截断计数</text>
+    <text x="720" y="707" class="small muted">100 条错误 · 1000 个当前定时器</text>
+  </g>
+  <text x="696" y="764" class="small muted">心跳过期清理 · 多个目标应用共享</text>
+
+  <g class="component" data-component="tui">
+    <rect x="1232" y="332" width="232" height="120" rx="10" class="node"/>
+    <text x="1252" y="373" class="heading">交互式 TUI</text>
+    <text x="1252" y="407" class="mono small">React / Ink</text>
+    <text x="1252" y="433" class="tiny muted">趋势图 / 键盘 / 行差异渲染</text>
+  </g>
+  <g class="component" data-component="cli">
+    <rect x="1488" y="332" width="232" height="120" rx="10" class="node"/>
+    <text x="1508" y="373" class="heading">结构化 CLI</text>
+    <text x="1508" y="407" class="mono small">Commander · --json</text>
+    <text x="1508" y="433" class="tiny muted">JSON 结果 / 错误码 / 退出码</text>
+  </g>
+  <g class="component" data-component="core">
+    <rect x="1232" y="508" width="488" height="184" rx="10" fill="#fff" stroke="#d97757" stroke-width="2"/>
+    <text x="1256" y="550" class="heading">共享诊断内核</text>
+    <text x="1256" y="586" class="mono" style="font-size:18px">executeDiagnostic + PluginRegistry</text>
+    <text x="1256" y="622" class="small">CPU / Heap / Report / 代码执行 / 组合诊断</text>
+    <text x="1256" y="660" class="small muted">超时与取消 · 会话清理 · 证据分析 · 历史</text>
+  </g>
+  <g class="component" data-component="agent-client">
+    <rect x="1232" y="748" width="232" height="108" rx="10" class="node"/>
+    <text x="1252" y="790" class="mono" style="font-size:21px;font-weight:600">AgentClient</text>
+    <text x="1252" y="825" class="small muted">身份校验 / 指标读取</text>
+  </g>
+  <g class="component" data-component="inspector-session">
+    <rect x="1488" y="748" width="232" height="108" rx="10" class="node"/>
+    <text x="1508" y="790" class="mono" style="font-size:19px;font-weight:600">InspectorSession</text>
+    <text x="1508" y="825" class="small muted">按需连接 / 所有权清理</text>
+  </g>
+  <text x="1232" y="892" class="small muted">两个入口共享插件、结果契约与诊断能力</text>
+
+  <!-- Opaque masks keep interface labels readable across the connector lines. -->
+  <rect x="522" y="401" width="156" height="62" rx="5" class="mask"/>
+  <text x="600" y="425" text-anchor="middle" class="small http-text">HTTP 上报</text>
+  <text x="600" y="449" text-anchor="middle" class="tiny muted">注册 / 心跳 / 指标</text>
+  <rect x="1088" y="592" width="120" height="58" rx="5" class="mask"/>
+  <text x="1148" y="615" text-anchor="middle" class="small http-text">HTTP 读取</text>
+  <text x="1148" y="638" text-anchor="middle" class="mono" style="font-size:12px">/metrics/:pid</text>
+  <rect x="838" y="520" width="68" height="28" rx="4" class="mask"/>
+  <text x="872" y="540" text-anchor="middle" class="tiny muted">读写</text>
+  <rect x="668" y="834" width="208" height="36" rx="5" class="mask"/>
+  <text x="772" y="858" text-anchor="middle" class="small">启动 / 复用 daemon</text>
+  <text x="668" y="895" class="small muted">Unix：fd3 · Windows：/info 就绪确认</text>
+  <rect x="542" y="948" width="650" height="40" rx="5" class="mask"/>
+  <text x="867" y="974" text-anchor="middle" class="cdp-text" style="font-size:18px">CDP / WebSocket · 按需诊断 · 默认 127.0.0.1:9229</text>
+  <rect x="1602" y="988" width="140" height="34" rx="5" class="mask"/>
+  <text x="1672" y="1011" text-anchor="middle" style="font-size:16px">产物 / 历史读写</text>
+
+  <g class="component" data-component="shared">
+    <rect x="48" y="1036" width="1032" height="160" rx="12" fill="#eeeadf" stroke="#c6c3b8" stroke-width="1.5" stroke-dasharray="7 5"/>
+    <text x="80" y="1080" class="mono" style="font-size:26px;font-weight:600">@mitojs/node-shared</text>
+    <text x="456" y="1080" style="font-size:21px">SDK / CLI 共同依赖的代码库</text>
+    <text x="80" y="1122">指标类型 · Subject / DataSource 常量 · CPU / Memory / Heap 采集 recipes</text>
+    <text x="80" y="1164" class="small muted">随 SDK / CLI 运行于调用方进程内</text>
+  </g>
+  <g class="component" data-component="filesystem">
+    <rect x="1200" y="1036" width="552" height="160" rx="12" class="node"/>
+    <text x="1224" y="1076" class="heading">本地文件系统</text>
+    <text x="1224" y="1112" class="mono small">.cpuprofile · .heapsnapshot · report JSON</text>
+    <text x="1224" y="1146">HistoryStore：用户数据目录</text>
+    <text x="1224" y="1178" class="small muted">最多 100 条 / 10 MiB；历史与产物分别管理</text>
+  </g>
+
+  <path d="M48 1232H94" stroke="#637749" stroke-width="2.2"/>
+  <text x="106" y="1238" class="small muted">HTTP 接口依赖</text>
+  <path d="M300 1232H346" stroke="#b85c3e" stroke-width="2.4"/>
+  <text x="358" y="1238" class="small muted">CDP 连接</text>
+  <path d="M522 1232H568" stroke="#87867f" stroke-width="1.8" stroke-dasharray="7 6"/>
+  <text x="580" y="1238" class="small muted">进程生命周期</text>
+  <text x="1752" y="1238" text-anchor="end" class="small muted">边界框表示运行归属 · 所有端口均为默认值</text>
+</svg>
