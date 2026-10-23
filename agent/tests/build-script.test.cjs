@@ -1,9 +1,35 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { spawnSync } = require('node:child_process')
+const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const script = path.resolve(__dirname, '../build.sh')
+
+test('package build entry launches its shell helper without requiring execute permissions', () => {
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mito-build-entry-'))
+	try {
+		const project = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../package.json'), 'utf8'))
+		fs.mkdirSync(path.join(directory, 'agent'))
+		fs.writeFileSync(
+			path.join(directory, 'package.json'),
+			JSON.stringify({ private: true, scripts: { 'build:rust': project.scripts['build:rust'] } })
+		)
+		// Windows package scripts use cmd.exe; the Bash helper must have an explicit interpreter.
+		// A non-executable fixture catches that requirement on Unix without compiling the Agent.
+		fs.writeFileSync(path.join(directory, 'agent/build.sh'), 'printf "invoked" > entry-result.txt\n', { mode: 0o644 })
+		const result = spawnSync('pnpm', ['run', 'build:rust'], {
+			cwd: directory,
+			encoding: 'utf8',
+			shell: process.platform === 'win32',
+		})
+		assert.equal(result.status, 0, result.stderr || result.error?.message)
+		assert.equal(fs.readFileSync(path.join(directory, 'agent/entry-result.txt'), 'utf8'), 'invoked')
+	} finally {
+		fs.rmSync(directory, { recursive: true, force: true })
+	}
+})
+
 function shell(source, cwd = os.tmpdir()) {
 	return spawnSync('bash', ['-c', `source '${script}'; ${source}`], { cwd, encoding: 'utf8' })
 }

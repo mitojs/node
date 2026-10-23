@@ -10,7 +10,7 @@
 	],
 	"scripts": {
 		"commit": "git add . && git czg",
-		"build:rust": "cd ./agent && ./build.sh",
+		"build:rust": "cd ./agent && bash ./build.sh",
 		"build": "pnpm run build:ts && pnpm run build:rust",
 		"test": "pnpm run test:packaging && pnpm -r --if-present run test",
 		"web:dev": "pnpm --filter @mono/react-19 dev",
