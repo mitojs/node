@@ -15,12 +15,19 @@ describe('real Inspector diagnosis and history integration', () => {
 		const target = spawn(
 			process.execPath,
 			[
+				// 固定测试负载为未优化函数，避免短窗口的具名栈帧断言受 V8 热代码归因变化影响。
+				'--no-opt',
 				'--inspect=127.0.0.1:0',
 				'-e',
 				`
+			let workSink = 0;
 			function busyWork() {
 				const end = performance.now() + 8;
-				while (performance.now() < end) { Math.sqrt(Math.random()); }
+				// Batch observable JS work so clock/native calls do not dominate the short CPU sample.
+				do {
+					for (let i = 0; i < 50000; i++) workSink = (Math.imul(workSink ^ i, 1664525) + 1013904223) | 0;
+				} while (performance.now() < end);
+				globalThis.workSink = workSink;
 				setImmediate(busyWork);
 			}
 			console.log(new URL(require('node:inspector').url()).port);
@@ -54,7 +61,8 @@ describe('real Inspector diagnosis and history integration', () => {
 				result.data.cpu.hotspots.some(
 					(frame: { functionName: string; selfTimeMs: number }) =>
 						frame.functionName === 'busyWork' && frame.selfTimeMs > 0
-				)
+				),
+				JSON.stringify(result.data.cpu.hotspots)
 			).toBe(true)
 			expect(result.data.unavailable).toEqual([
 				{ kind: 'timers', error: 'Fresh timer data requires @mitojs/node SDK with Timeout enabled.' },
