@@ -1,0 +1,19 @@
+{
+	"extends": "@mono/tsconfig/tsconfig.json",
+	"compilerOptions": {
+		"rootDir": "src",
+		"outDir": "dist",
+		"target": "ES2020",
+		"module": "commonjs",
+		"moduleResolution": "node",
+		"declaration": true,
+		"declarationMap": true,
+		"composite": true,
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": ["src/**/*.spec.ts"]
+}

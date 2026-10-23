@@ -30,7 +30,7 @@ impl Default for TcpConfig {
     fn default() -> Self {
         Self {
             port: AGENT_TCP_PORT,
-            host: "localhost".to_string(),
+            host: "127.0.0.1".to_string(),
         }
     }
 }
@@ -67,6 +67,10 @@ impl AppConfig {
             return Err("TCP 端口不能为 0".to_string());
         }
 
+        // Agent 具备采集数据和进程控制能力，只允许回环地址。
+        if !["127.0.0.1", "localhost", "::1"].contains(&self.tcp.host.as_str()) {
+            return Err("Agent 只允许监听本机回环地址".into());
+        }
         Ok(())
     }
 

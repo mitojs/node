@@ -1,20 +1,15 @@
+import { getMemoryInjectable } from '@mitojs/node-shared/recipes'
 import type { DiagnosticPlugin } from '../core/plugin.js'
-import { ensureSession, FUNCTION_WRAPPER } from '../helper.js'
-
+import { DataSource, ensureSession, FUNCTION_WRAPPER, ok, readAgentMetrics } from '../helper.js'
 export const memoryPlugin: DiagnosticPlugin = {
 	name: 'memory',
-	description: 'get memory info of the target process',
+	label: '查看内存详情',
+	subject: 'Memory',
+	description: 'Get V8 heap and process memory in bytes',
 	async execute(ctx) {
-		// 优先使用 Agent 通道（SDK 已采集的数据）
-		if (ctx.agentClient) {
-			const metrics = await ctx.agentClient.getMetrics(ctx.pid)
-			if (metrics?.memory) {
-				return { success: true, data: { ...metrics.memory, source: 'agent' } }
-			}
-		}
-		// 回退到 Inspector 注入
+		const metrics = await readAgentMetrics(ctx, 'Memory')
+		if (metrics?.memory) return ok(metrics.memory, DataSource.AGENT)
 		const session = await ensureSession(ctx)
-		const data = await session.evaluate(FUNCTION_WRAPPER(`return process.memoryUsage();`))
-		return { success: true, data: { ...data, source: 'inspector' } }
+		return ok(await session.evaluate(FUNCTION_WRAPPER(getMemoryInjectable())), DataSource.INSPECTOR)
 	},
 }

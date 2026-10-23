@@ -6,6 +6,9 @@
 		"useIgnoreFile": true,
 		"defaultBranch": "master"
 	},
+	"files": {
+		"includes": ["**", "!docs/reports/**", "!.planning/**"]
+	},
 	"formatter": {
 		"enabled": true,
 		"formatWithErrors": false,

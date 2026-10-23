@@ -1,159 +1,101 @@
 #!/usr/bin/env node
-import { program } from 'commander'
+import { Command, CommanderError } from 'commander'
 import { registry } from './core/registry.js'
-import { logger } from './logger.js'
 import { registerBuiltinPlugins } from './plugins/index.js'
-import { AgentClient } from './services/agent-client.js'
-import { InspectorError, InspectorSession } from './services/inspector-session.js'
+import { executeDiagnostic } from './services/diagnostic-runner.js'
 import { createOutputFormatter } from './services/output-formatter.js'
 
-interface CmdOptions {
-	pid: string
-	port?: string
-	json?: boolean
-}
-
-// CLI 命令名 → SDK Subject 名的映射
-const COMMAND_SUBJECT_MAP: Record<string, string> = {
-	'monitor-cpu': 'CPU',
-	memory: 'Memory',
-	'monitor-memory': 'Memory',
-	timers: 'Timeout',
-}
-
+const program = new Command()
+const jsonRequested = process.argv.includes('--json')
 registerBuiltinPlugins()
-
 program
-	.option('-p, --pid <pid>', 'process id of the target process')
-	.option('--port <port>', 'inspector port of the target process', '9229')
-	.option('--json', 'output in JSON format for programmatic consumption', false)
-	.option('-i, --interactive', 'enter interactive TUI mode', false)
-	.action(() => {
-		if (program.opts().interactive) {
-			// @ts-expect-error 独立打包产物，运行时由 cli.mjs 同目录的 interactive-cli.mjs 提供
-			import('./interactive-cli.mjs')
-		} else {
+	.name('mito-node')
+	.description('Node.js diagnostics for people and AI agents')
+	.option('-p, --pid <pid>', 'target Node.js process ID')
+	.option('--port <port>', 'target configured Inspector port', '9229')
+	.option('--agent-port <port>', 'local Agent port', process.env.MITO_AGENT_TCP_PORT || '16666')
+	.option('--timeout <ms>', 'total diagnostic timeout in milliseconds', '30000')
+	.option('--dir <dir>', 'directory for generated diagnostic artifacts')
+	.option('--history-dir <dir>', 'directory for diagnostic history')
+	.option('--no-history', 'do not persist this diagnostic result')
+	.option('--json', 'emit one JSON result for automation', false)
+	.option('-i, --interactive', 'open the diagnostic workbench', false)
+	.exitOverride()
+	.configureOutput({
+		writeErr: (text) => {
+			if (!jsonRequested) process.stderr.write(text)
+		},
+	})
+	.action(async () => {
+		const options = program.opts()
+		if (!options.interactive) {
+			if (options.json) throw new CommanderError(2, 'commander.missingArgument', 'A diagnostic command is required.')
 			program.help()
+			return
 		}
+		if (options.json)
+			throw new CommanderError(2, 'commander.conflictingOption', '--interactive and --json cannot be combined.')
+		// Ink is loaded only for human interaction; machine commands avoid its startup cost and console renderer.
+		// @ts-expect-error The interactive entry is a sibling generated bundle.
+		const { startInteractive } = await import('./interactive-cli.mjs')
+		await startInteractive({
+			pid: options.pid === undefined ? undefined : Number(options.pid),
+			port: Number(options.port),
+			agentPort: Number(options.agentPort),
+			historyDir: options.historyDir,
+		})
 	})
 
 for (const plugin of registry.getAll()) {
 	const command = program.command(plugin.name).description(plugin.description)
-	if (plugin.options) {
-		for (const opt of plugin.options) {
-			if (opt.defaultValue) {
-				command.option(opt.flags, opt.description, opt.defaultValue)
-			} else {
-				command.option(opt.flags, opt.description)
-			}
-		}
-	}
-	command.action(async (cmdOptions) => {
-		const globalOpts = program.opts<CmdOptions>()
-		logger.debug('process.argv', process.argv)
-		logger.debug('options', globalOpts, plugin.name, cmdOptions)
-
-		const pid = Number(globalOpts.pid)
-		if (Number.isNaN(pid) || !globalOpts.pid) {
-			console.error('Error: --pid is required for this command')
-			process.exit(1)
-		}
+	for (const option of plugin.options ?? []) command.option(option.flags, option.description, option.defaultValue)
+	command.action(async (localOptions) => {
+		const globalOptions = program.opts()
+		const controller = new AbortController()
+		const cancel = () => controller.abort()
+		process.once('SIGINT', cancel)
+		process.once('SIGTERM', cancel)
 		try {
-			process.kill(pid, 0)
-		} catch {
-			console.error(`Error: process ${pid} does not exist`)
-			process.exit(1)
-		}
-
-		const port = Number(globalOpts.port)
-		const resolvedPort = Number.isNaN(port) ? 9229 : port
-		const json = globalOpts.json ?? false
-		const output = createOutputFormatter(json)
-
-		// 自动检测 Agent 是否可用，并判断是否需要 Inspector
-		const agentClient = new AgentClient()
-		const agentAvailable = await agentClient.isAvailable()
-
-		let session: InspectorSession | undefined
-		let passAgentClient: AgentClient | undefined
-
-		if (agentAvailable) {
-			const processInfo = await agentClient.getProcessInfo(pid)
-			const requiredSubject = COMMAND_SUBJECT_MAP[plugin.name]
-
-			if (processInfo && requiredSubject && processInfo.registeredSubjects.includes(requiredSubject)) {
-				// Agent 已注册对应的 subject → 不开 Inspector，走 Agent 通道
-				logger.debug(`Subject "${requiredSubject}" registered in Agent, skipping Inspector`)
-				passAgentClient = agentClient
-			} else {
-				// Agent 没注册对应 subject 或命令不在 map 中 → 开 Inspector
-				session = new InspectorSession()
-				try {
-					await session.open(pid, resolvedPort)
-					await session.connect(resolvedPort)
-				} catch (e: any) {
-					if (e instanceof InspectorError) {
-						output({
-							success: false,
-							command: plugin.name,
-							error: e.message,
-							errorCode: e.code,
-							suggestion: e.suggestion,
-						})
-					} else {
-						output({ success: false, command: plugin.name, error: e.message })
-					}
-					process.exit(1)
+			const result = await executeDiagnostic(
+				plugin.name,
+				{ ...globalOptions, ...localOptions },
+				{
+					pid: Number(globalOptions.pid),
+					port: Number(globalOptions.port),
+					agentPort: Number(globalOptions.agentPort),
+					timeout: Number(globalOptions.timeout),
+					historyDir: globalOptions.historyDir,
+					recordHistory: globalOptions.history,
+					signal: controller.signal,
 				}
-				passAgentClient = agentClient
-			}
-		} else {
-			// Agent 不可用 → 开 Inspector
-			session = new InspectorSession()
-			try {
-				await session.open(pid, resolvedPort)
-				await session.connect(resolvedPort)
-			} catch (e: any) {
-				if (e instanceof InspectorError) {
-					output({
-						success: false,
-						command: plugin.name,
-						error: e.message,
-						errorCode: e.code,
-						suggestion: e.suggestion,
-					})
-				} else {
-					output({ success: false, command: plugin.name, error: e.message })
-				}
-				process.exit(1)
-			}
-		}
-
-		try {
-			const result = await plugin.execute(
-				{ pid, port: resolvedPort, json, session, agentClient: passAgentClient, output },
-				cmdOptions
 			)
-			if (result.success) {
-				output({ success: true, command: plugin.name, data: result.data })
-			} else {
-				output({ success: false, command: plugin.name, error: result.error })
-			}
-		} catch (e: any) {
-			if (e instanceof InspectorError) {
-				output({ success: false, command: plugin.name, error: e.message, errorCode: e.code, suggestion: e.suggestion })
-			} else {
-				output({ success: false, command: plugin.name, error: (e as Error).message })
-			}
+			createOutputFormatter(globalOptions.json)(result)
+			process.exitCode = result.success
+				? 0
+				: result.errorCode === 'INVALID_ARGUMENT'
+					? 2
+					: result.errorCode === 'CANCELLED'
+						? 130
+						: 1
+		} finally {
+			process.off('SIGINT', cancel)
+			process.off('SIGTERM', cancel)
 		}
-
-		// start-inspect 需要保持 Inspector 开启供 DevTools 连接，不执行 cleanup
-		if (plugin.name !== 'start-inspect' && session) {
-			session.closeInspector().catch(() => {})
-		}
-		if (session) session.close()
-		process.exit(0)
 	})
 }
 
-program.parse(process.argv)
+try {
+	await program.parseAsync(process.argv)
+} catch (error) {
+	const value = error as CommanderError
+	if (value.code === 'commander.helpDisplayed' || value.code === 'commander.version') process.exitCode = 0
+	else {
+		createOutputFormatter(jsonRequested)({
+			success: false,
+			command: program.args[0] || 'mito-node',
+			error: value.message,
+			errorCode: 'INVALID_ARGUMENT',
+		})
+		process.exitCode = 2
+	}
+}

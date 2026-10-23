@@ -35,3 +35,27 @@ export function getStackFilePath(functionName?: string, callSiteFrameIndex = 6) 
 	Error.stackTraceLimit = oldLimit
 	return stack
 }
+
+// 捕获时保留创建调用栈，诊断真正消费活跃定时器时才格式化；短命句柄不承担字符串化成本。
+export function captureStackFilePath(functionName?: string, callSiteFrameIndex = 6): () => string {
+	const oldLimit = Error.stackTraceLimit
+	const dummyObject = { functionName } as TargetObject
+	Error.stackTraceLimit = callSiteFrameIndex
+	try {
+		Error.captureStackTrace(dummyObject, captureStackFilePath)
+	} finally {
+		Error.stackTraceLimit = oldLimit
+	}
+	let cached: string | undefined
+	return () => {
+		if (cached !== undefined) return cached
+		const handler = Error.prepareStackTrace
+		Error.prepareStackTrace = prepareStackTrace
+		try {
+			cached = dummyObject.stack as string
+			return cached || ''
+		} finally {
+			Error.prepareStackTrace = handler
+		}
+	}
+}

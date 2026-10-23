@@ -4,32 +4,52 @@
 	"description": "@mitojs/node",
 	"author": "cjinhuo",
 	"license": "MIT",
-	"main": "src/index.ts",
-	"module": "src/index.ts",
-	"types": "src/index.ts",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
 	"publishConfig": {
-		"main": "dist/index.js",
-		"module": "dist/index.esm.js",
-		"types": "dist/index.d.ts"
+		"access": "public",
+		"executableFiles": [
+			"binaries/mitojs-agent-darwin-arm64",
+			"binaries/mitojs-agent-darwin-x64",
+			"binaries/mitojs-agent-linux-x64-musl",
+			"binaries/mitojs-agent-linux-arm64-musl",
+			"binaries/mitojs-agent-win-x64.exe"
+		]
 	},
 	"files": [
 		"dist",
-		"binaries"
+		"binaries/mitojs-agent-darwin-arm64",
+		"binaries/mitojs-agent-darwin-x64",
+		"binaries/mitojs-agent-linux-x64-musl",
+		"binaries/mitojs-agent-linux-arm64-musl",
+		"binaries/mitojs-agent-win-x64.exe",
+		"binaries/manifest.json"
 	],
 	"scripts": {
-		"esm": "tsc -b ./tsconfig.json",
+		"esm": "node ../../scripts/build-tsc.mjs .",
 		"watch:esm": "tsc -b ./tsconfig.json --watch",
 		"test": "vitest run",
 		"build:rust": "cd ../../agent && ./build.sh",
-		"prebuild": "npm run build:rust",
-		"build": "npm run esm"
+		"build": "npm run esm",
+		"test:coverage": "vitest run --coverage"
 	},
 	"devDependencies": {
 		"@mono/tsconfig": "workspace:*",
 		"vitest": "^4.1.8"
 	},
 	"dependencies": {
+		"@mitojs/node-shared": "workspace:*",
 		"deepmerge": "^4.3.1",
 		"rxjs": "^7.8.2"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.js"
+		}
+	},
+	"engines": {
+		"node": "^20.19.0 || >=22.12.0"
 	}
 }

@@ -1,10 +1,9 @@
 import { cpuUsage, hrtime } from 'node:process'
+import { calculateCpuPercent } from '@mitojs/node-shared/recipes'
+import type { CPUData } from '@mitojs/node-shared/types'
 import { BaseCollector } from './base'
 
-export interface CPUData {
-	load: number
-	useLoad: number
-}
+export type { CPUData } from '@mitojs/node-shared/types'
 
 export class CPUCollector extends BaseCollector<CPUData> {
 	private _lastHrtime: bigint
@@ -18,22 +17,15 @@ export class CPUCollector extends BaseCollector<CPUData> {
 	}
 
 	public get() {
-		// todo 通过 Rust 获取 getThreadCPUUsage
 		const currentCpuUsage = cpuUsage()
 		// nanoseconds 转成 microsecond
 		const timeDiff = Number(hrtime.bigint() - this._lastHrtime) / 1e3
 		const userDiff = currentCpuUsage.user - this._lastCpuUsage.user
 		const systemDiff = currentCpuUsage.system - this._lastCpuUsage.system
 
-		const load = ((userDiff + systemDiff) / timeDiff) * 100
-		const useLoad = (userDiff / timeDiff) * 100
-
 		this._lastHrtime = hrtime.bigint()
 		this._lastCpuUsage = currentCpuUsage
-		return {
-			load,
-			useLoad,
-		}
+		return calculateCpuPercent(userDiff, systemDiff, timeDiff)
 	}
 
 	destroy() {

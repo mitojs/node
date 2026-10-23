@@ -1,0 +1,106 @@
+name: Assemble verified release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified tarballs to npm (package versions must already be updated)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Fresh Agent / ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+            executable: mitojs-agent
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            executable: mitojs-agent
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            executable: mitojs-agent
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            executable: mitojs-agent
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            executable: mitojs-agent.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: agent
+      - name: Install native Linux musl linker
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Compile and test current source
+        working-directory: agent
+        run: |
+          cargo test --locked
+          cargo build --locked --release --target '${{ matrix.target }}' --bin mitojs-agent
+      - name: Collect compiled binary with source commit and checksum
+        run: node scripts/collect-agent-binary.mjs --target '${{ matrix.target }}' --from 'agent/target/${{ matrix.target }}/release/${{ matrix.executable }}' --to release-binary --commit '${{ github.sha }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.target }}
+          path: release-binary/
+          if-no-files-found: error
+
+  packages:
+    needs: native
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: release-binaries
+          merge-multiple: true
+      - name: Require all five binaries from this exact source commit
+        run: node scripts/assemble-release-binaries.mjs --from release-binaries --to packages/node/binaries --commit '${{ github.sha }}'
+      - name: Build and verify actual published artifacts
+        run: |
+          pnpm run build:ts
+          pnpm test
+          pnpm run pack:local --output docs/reports/implementation/packages-release.json --pack-destination release-packages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-npm-packages
+          path: |
+            release-packages/*.tgz
+            packages/node/binaries/manifest.json
+            docs/reports/implementation/packages-release.json
+          if-no-files-found: error
+      - name: Publish verified tarballs in dependency order
+        if: inputs.publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          pnpm publish release-packages/mitojs-node-shared-*.tgz --access public --no-git-checks
+          pnpm publish release-packages/mitojs-node-[0-9]*.tgz --access public --no-git-checks
+          pnpm publish release-packages/mitojs-node-cli-*.tgz --access public --no-git-checks

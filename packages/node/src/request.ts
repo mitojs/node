@@ -1,36 +1,48 @@
 import { configMap } from './config'
-import { easyFetch, type FetchOptions, retry } from './shared/utils'
+import { easyFetch, type FetchOptions } from './shared/utils'
 import type { RegisterProcessData } from './types'
 
-const getAgentRequestBasePath = () => `http://${configMap.get('agentHost')}:${configMap.get('agentTCPPort')}`
-
-const AGENT_REQUEST_REGISTER_PROCESS_PATH = '/ipc/register_process'
-const AGENT_REQUEST_UPDATE_PROCESS_PATH = '/ipc/update_process'
-const AGENT_REQUEST_GET_UDS_PATH = '/ipc/get_uds_path'
-
-export async function requestToAgent<T>(path: string, options: FetchOptions) {
-	return retry<T>(async () => {
-		const res = await easyFetch(`${getAgentRequestBasePath()}${path}`, options)
-		return await res.json()
-	})
+export class AgentRequestError extends Error {
+	constructor(
+		message: string,
+		readonly status?: number
+	) {
+		super(message)
+	}
 }
 
-export async function registerProcessToAgent(data: RegisterProcessData) {
-	return requestToAgent<{ code: number; message: string }>(AGENT_REQUEST_REGISTER_PROCESS_PATH, {
+// 所有请求有时间上限，4xx 不重试，避免未注册 PID 等永久错误制造后台请求风暴。
+export async function requestToAgent<T>(path: string, options: FetchOptions = {}): Promise<T> {
+	const url = `http://${configMap.get('agentHost')}:${configMap.get('agentTCPPort')}${path}`
+	for (let attempt = 0; ; attempt++) {
+		try {
+			const response = await easyFetch(url, { timeout: 1000, ...options })
+			if (response.status < 200 || response.status >= 300)
+				throw new AgentRequestError(`Agent HTTP ${response.status}`, response.status)
+			const data = await response.json()
+			if (data.success === false) throw new AgentRequestError(data.message || 'Agent rejected request')
+			return data as T
+		} catch (error) {
+			if (
+				options.signal?.aborted ||
+				attempt >= 1 ||
+				(error instanceof AgentRequestError && error.status && error.status < 500)
+			)
+				throw error
+		}
+	}
+}
+
+export function registerProcessToAgent(data: RegisterProcessData, signal?: AbortSignal) {
+	return requestToAgent('/ipc/register_process', { method: 'POST', body: JSON.stringify(data), signal })
+}
+export function unregisterProcessFromAgent(signal?: AbortSignal) {
+	return requestToAgent('/ipc/unregister_process', {
 		method: 'POST',
-		body: JSON.stringify(data),
+		body: JSON.stringify({ pid: process.pid }),
+		signal,
 	})
 }
-
-export async function updateProcessToAgent(data: RegisterProcessData) {
-	return requestToAgent<{ code: number; message: string }>(AGENT_REQUEST_UPDATE_PROCESS_PATH, {
-		method: 'POST',
-		body: JSON.stringify(data),
-	})
-}
-
-export async function getUDSPathFromAgent() {
-	return requestToAgent<{ code: number; message: string; data: { uds_path: string } }>(AGENT_REQUEST_GET_UDS_PATH, {
-		method: 'GET',
-	})
+export function heartbeatToAgent(signal?: AbortSignal) {
+	return requestToAgent('/heartbeat', { method: 'POST', body: JSON.stringify({ process_id: process.pid }), signal })
 }

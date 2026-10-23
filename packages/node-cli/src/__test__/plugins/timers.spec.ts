@@ -1,146 +1,95 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { DiagnosticContext } from '../../core/types'
-import { timersPlugin } from '../../plugins/timers'
-import type { AgentClient, MetricsData } from '../../services/agent-client'
-import type { InspectorSession } from '../../services/inspector-session'
+import { createServer, type Server } from 'node:http'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { DiagnosticContext } from '../../core/types.js'
+import { timersPlugin } from '../../plugins/timers.js'
+import { AgentClient } from '../../services/agent-client.js'
+import type { InspectorSession } from '../../services/inspector-session.js'
 
-vi.mock('../../helper', () => ({
-	FUNCTION_WRAPPER: vi.fn((code: string) => `wrapped(${code})`),
-}))
-
-function createMockSession(evaluateResult: any): InspectorSession {
-	return {
-		evaluate: vi.fn().mockResolvedValue(evaluateResult),
-		sendMessage: vi.fn(),
-		open: vi.fn(),
-		connect: vi.fn(),
-		close: vi.fn(),
-		closeInspector: vi.fn(),
-	} as any
+const servers: Server[] = []
+afterEach(async () => {
+	await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))))
+})
+const timers = [
+	{ id: 1, name: 'setTimeout', stack: 'at work (foo.js:1:2)', destroyed: false },
+	{ id: 2, name: 'setInterval', stack: 'at poll (bar.js:10:3)', destroyed: false },
+]
+async function agent(options: { timers?: unknown; registered?: string[]; updated?: number; success?: boolean } = {}) {
+	const server = createServer((req, res) => {
+		res.setHeader('content-type', 'application/json')
+		res.end(
+			JSON.stringify(
+				req.url === '/info'
+					? { name: 'mitojs-agent', protocol_version: 1, version: '0.1.0', status: 'running', pid: process.pid }
+					: {
+							success: options.success ?? true,
+							data: { cpu: null, memory: null, errors: [], timers: options.timers ?? timers, last_updated: Date.now() },
+							registered_subjects: options.registered ?? ['Timeout'],
+							updated_at: { Timeout: options.updated ?? Date.now() },
+							intervals: { Timeout: 1000 },
+							truncated: { errors: 0, timers: 0 },
+						}
+			)
+		)
+	})
+	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+	servers.push(server)
+	const client = new AgentClient((server.address() as { port: number }).port)
+	expect(await client.isAvailable()).toBe(true)
+	return client
 }
-
-function createMockAgentClient(metrics: MetricsData | null): AgentClient {
-	return {
-		isAvailable: vi.fn().mockResolvedValue(true),
-		getMetrics: vi.fn().mockResolvedValue(metrics),
-	} as any
-}
-
-function createContext(overrides: Partial<DiagnosticContext> = {}): DiagnosticContext {
+function context(agentClient?: AgentClient): DiagnosticContext {
 	return {
 		pid: 12345,
 		port: 9229,
-		json: false,
-		session: createMockSession(null),
-		output: vi.fn(),
-		...overrides,
+		json: true,
+		agentClient,
+		output: () => {},
+		session: {
+			evaluate: async () => {
+				throw new Error('A text-only Inspector SDK hint is not timer evidence')
+			},
+		} as unknown as InspectorSession,
 	}
 }
 
-describe('timersPlugin', () => {
-	it('should have correct metadata', () => {
-		expect(timersPlugin.name).toBe('timers')
-		expect(timersPlugin.description).toBeDefined()
-		expect(timersPlugin.description).toContain('timer')
-	})
-
-	describe('Agent mode', () => {
-		it('should return timers from agentClient when available', async () => {
-			const mockTimers = [
-				{ type: 'setTimeout', delay: 1000, stack: 'at foo.js:1' },
-				{ type: 'setInterval', delay: 5000, stack: 'at bar.js:10' },
-			]
-			const agentClient = createMockAgentClient({ timers: mockTimers } as unknown as MetricsData)
-			const session = createMockSession(null)
-			const ctx = createContext({ agentClient, session })
-
-			const result = await timersPlugin.execute(ctx, {})
-
-			expect(result.success).toBe(true)
-			expect(result.data.timers).toEqual(mockTimers)
-			expect(result.data.source).toBe('agent')
-			expect(agentClient.getMetrics).toHaveBeenCalledWith(12345)
-			expect(session.evaluate).not.toHaveBeenCalled()
-		})
-
-		it('should fallback to Inspector when agentClient has no timers data', async () => {
-			const agentClient = createMockAgentClient({ cpu: { load: 10, useLoad: 5 } } as MetricsData)
-			const inspectorData = { sdkActive: true, message: 'Timer data is available via Agent channel.' }
-			const session = createMockSession(inspectorData)
-			const ctx = createContext({ agentClient, session })
-
-			const result = await timersPlugin.execute(ctx, {})
-
-			expect(result.success).toBe(true)
-			expect(result.data.source).toBe('inspector')
-			expect(session.evaluate).toHaveBeenCalled()
-		})
-
-		it('should fallback to Inspector when agentClient timers is empty array', async () => {
-			const agentClient = createMockAgentClient({ timers: [] } as unknown as MetricsData)
-			const inspectorData = { sdkActive: true, message: 'Timer data is available via Agent channel.' }
-			const session = createMockSession(inspectorData)
-			const ctx = createContext({ agentClient, session })
-
-			const result = await timersPlugin.execute(ctx, {})
-
-			expect(result.success).toBe(true)
-			expect(result.data.source).toBe('inspector')
-			expect(session.evaluate).toHaveBeenCalled()
-		})
-
-		it('should fallback to Inspector when agentClient.getMetrics returns null', async () => {
-			const agentClient = createMockAgentClient(null)
-			const inspectorData = { sdkActive: false, message: 'Timer detection requires @mitojs/node SDK' }
-			const session = createMockSession(inspectorData)
-			const ctx = createContext({ agentClient, session })
-
-			const result = await timersPlugin.execute(ctx, {})
-
-			expect(result.success).toBe(false)
-			expect(result.error).toContain('Timer detection requires @mitojs/node SDK')
+describe('current timer snapshots', () => {
+	it('returns actual active timer identities and creation stacks from the Agent', async () => {
+		expect(await timersPlugin.execute(context(await agent()), {})).toEqual({
+			success: true,
+			data: { timers, source: 'agent' },
 		})
 	})
-
-	describe('Inspector fallback', () => {
-		it('should return error when SDK is not loaded', async () => {
-			const inspectorData = {
-				sdkActive: false,
-				message: 'Timer detection requires @mitojs/node SDK to be loaded in the target process.',
-			}
-			const session = createMockSession(inspectorData)
-			const ctx = createContext({ session })
-
-			const result = await timersPlugin.execute(ctx, {})
-
-			expect(result.success).toBe(false)
-			expect(result.error).toBe('Timer detection requires @mitojs/node SDK to be loaded in the target process.')
+	it('accepts an observed empty snapshot as zero active timers', async () => {
+		expect(await timersPlugin.execute(context(await agent({ timers: [] })), {})).toEqual({
+			success: true,
+			data: { timers: [], source: 'agent' },
 		})
-
-		it('should return success with inspector source when SDK is active', async () => {
-			const inspectorData = {
-				sdkActive: true,
-				message: 'Timer data is available via Agent channel. Ensure Rust Agent is running.',
-			}
-			const session = createMockSession(inspectorData)
-			const ctx = createContext({ session })
-
-			const result = await timersPlugin.execute(ctx, {})
-
-			expect(result.success).toBe(true)
-			expect(result.data.source).toBe('inspector')
-			expect(result.data.sdkActive).toBe(true)
+	})
+	it('fails explicitly without SDK evidence', async () => {
+		expect(await timersPlugin.execute(context(), {})).toMatchObject({ success: false, errorCode: 'SDK_REQUIRED' })
+	})
+	it('fails explicitly when the timer subject is not registered', async () => {
+		expect(await timersPlugin.execute(context(await agent({ registered: ['Memory'] })), {})).toMatchObject({
+			success: false,
+			errorCode: 'SDK_REQUIRED',
 		})
-
-		it('should not call agentClient when it is not provided', async () => {
-			const inspectorData = { sdkActive: false, message: 'SDK not loaded' }
-			const session = createMockSession(inspectorData)
-			const ctx = createContext({ session })
-
-			const result = await timersPlugin.execute(ctx, {})
-
-			expect(result.success).toBe(false)
-			expect(session.evaluate).toHaveBeenCalled()
+	})
+	it('does not return stale timers as a current snapshot', async () => {
+		expect(await timersPlugin.execute(context(await agent({ updated: Date.now() - 10000 })), {})).toMatchObject({
+			success: false,
+			errorCode: 'SDK_REQUIRED',
+		})
+	})
+	it('fails when the Agent has no record of the target process', async () => {
+		expect(await timersPlugin.execute(context(await agent({ success: false })), {})).toMatchObject({
+			success: false,
+			errorCode: 'SDK_REQUIRED',
+		})
+	})
+	it('does not turn malformed timer payloads into a successful hint', async () => {
+		expect(await timersPlugin.execute(context(await agent({ timers: 'not a snapshot' })), {})).toMatchObject({
+			success: false,
+			errorCode: 'SDK_REQUIRED',
 		})
 	})
 })

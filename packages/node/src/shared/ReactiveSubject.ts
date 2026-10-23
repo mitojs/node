@@ -1,4 +1,6 @@
-import { type Observer, Subject, type Subscription } from 'rxjs'
+import type { Observer, Subscription } from 'rxjs'
+// RxJS 显式导出该子路径；只加载 Subject 依赖，避免监控 SDK 加载整个操作符入口。
+import { Subject } from 'rxjs/internal/Subject'
 
 /**
  * Building relationships with current instance of Client.

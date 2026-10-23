@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>MitoJS Node · 当前架构</title>
+<style>
+  :root {
+    --ivory: #FAF9F5;
+    --paper: #FFFFFF;
+    --slate: #141413;
+    --clay: #D97757;
+    --clay-d: #B85C3E;
+    --oat: #E3DACC;
+    --olive: #788C5D;
+    --rust: #B04A3F;
+    --info: #5C7CA3;
+    --gray-100: #F0EEE6;
+    --gray-300: #D1CFC5;
+    --gray-500: #87867F;
+    --gray-700: #3D3D3A;
+    --serif: ui-serif, Georgia, "Times New Roman", serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+    --border: 1.5px solid var(--gray-300);
+    --radius-row: 8px;
+    --radius-panel: 12px;
+    --shadow-lift: 0 10px 30px rgba(20,20,19,.10);
+    --ease-standard: cubic-bezier(.16, 1, .3, 1);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ivory: #1a1a19;
+      --paper: #242422;
+      --slate: #f0efe8;
+      --oat: #3a3630;
+      --gray-100: #2a2a27;
+      --gray-300: #4a4a44;
+      --gray-500: #9a9990;
+      --gray-700: #d4d3cc;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--ivory);
+    color: var(--gray-700);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1080px; margin: 0 auto; padding: 56px 28px 96px; }
+  h1, h2, h3 { font-family: var(--serif); font-weight: 500; color: var(--slate); letter-spacing: -.01em; }
+  h1 { font-size: clamp(28px, 4vw, 38px); line-height: 1.15; margin: 0 0 14px; }
+  h2 { font-size: 22px; margin: 42px 0 14px; }
+  h3 { font-size: 17px; margin: 0 0 8px; }
+  p { max-width: 720px; margin: 0 0 12px; }
+  code { font-family: var(--mono); font-size: .92em; background: var(--gray-100); border-radius: 4px; padding: 1px 4px; }
+  a { color: var(--clay); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--gray-500); margin-bottom: 10px; }
+  .panel { margin: 0; background: var(--paper); border: var(--border); border-radius: var(--radius-panel); padding: 22px; }
+  .content-stack { display: grid; gap: 14px; }
+  .content-stack > * { margin-block: 0; }
+  .callout { border: var(--border); border-left: 3px solid var(--clay); border-radius: var(--radius-row); background: var(--paper); padding: 14px 16px; }
+
+  /* Chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; border: var(--border); border-radius: 999px; background: var(--paper); font-family: var(--mono); font-size: 11.5px; padding: 5px 10px; cursor: pointer; transition: border-color 120ms ease; text-decoration: none; color: var(--gray-700); }
+  .chip:hover { border-color: var(--slate); }
+  .chip:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px rgba(92,124,163,.42); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot.clay { background: var(--clay); }
+  .dot.olive { background: var(--olive); }
+  .dot.oat { background: var(--oat); }
+  .dot.rust { background: var(--rust); }
+  .badge { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 3px 7px; border-radius: 5px; background: var(--gray-100); color: var(--gray-700); }
+  .badge.clay { background: rgba(217,119,87,.15); color: var(--clay-d); }
+  .badge.olive { background: rgba(120,140,93,.15); color: #5a6d44; }
+
+  /* At a Glance */
+  .glance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 14px; }
+  .glance-item { padding: 14px; border: var(--border); border-radius: var(--radius-row); background: var(--paper); }
+  .glance-item .label { font-family: var(--mono); font-size: 11px; text-transform: uppercase; color: var(--gray-500); margin-bottom: 4px; }
+  .glance-item .value { font-size: 14px; color: var(--slate); font-weight: 500; }
+
+  /* Key Files */
+  .adaptive-info-list { display: grid; container-type: inline-size; }
+  .info-row { display: grid; grid-template-columns: minmax(180px, 1.1fr) auto minmax(16em, 1.4fr); gap: 8px 14px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--gray-100); }
+  .info-row:last-child { border-bottom: 0; }
+  .info-row .path { min-width: 0; overflow-wrap: anywhere; font-family: var(--mono); font-size: 13px; color: var(--slate); }
+  .info-row .desc { min-width: 16em; }
+  @container (max-width: 620px) {
+    .info-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .info-row .desc { grid-column: 1 / -1; min-width: 0; }
+  }
+
+  /* Boundary Layers */
+  .boundary { border: 2px dashed var(--gray-300); border-radius: var(--radius-panel); padding: 16px; margin-top: 16px; position: relative; }
+  .boundary .boundary-label { position: absolute; top: -10px; left: 16px; background: var(--ivory); padding: 0 8px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; color: var(--gray-500); }
+  .boundary.trust { border-color: var(--clay); }
+  .boundary.trust .boundary-label { color: var(--clay-d); }
+
+  /* Details */
+  details { background: var(--paper); border: var(--border); border-radius: var(--radius-row); overflow: hidden; }
+  details + details { margin-top: 10px; }
+  summary { cursor: pointer; list-style: none; padding: 12px 14px; color: var(--slate); font-family: var(--mono); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "›"; color: var(--clay); font-size: 16px; transition: transform 150ms var(--ease-standard); }
+  details[open] summary::before { transform: rotate(90deg); }
+  details[open] summary { border-bottom: 1px solid var(--gray-100); }
+  .details-body { padding: 14px; }
+
+  /* Buttons */
+  .btn { appearance: none; border: 1.5px solid var(--slate); border-radius: 999px; background: var(--slate); color: var(--ivory); cursor: pointer; font-family: var(--mono); font-size: 12px; padding: 9px 14px; transition: background 120ms ease; }
+  .btn:hover { background: var(--gray-700); }
+  .btn.secondary { background: transparent; color: var(--gray-700); border-color: var(--gray-300); }
+  .btn:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px rgba(92,124,163,.42); }
+  .btn.copied { background: var(--olive); border-color: var(--olive); }
+
+  @media (max-width: 720px) {
+    .info-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .info-row .desc { grid-column: 1 / -1; min-width: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
+  @media print {
+    body { background: #fff; color: #1a1a1a; }
+    .btn, .chips { display: none; }
+    .panel, .glance-item, details { break-inside: avoid; border-color: #ccc; }
+  }
+
+  :root {
+    --serif: Georgia, "Songti SC", "Noto Serif CJK SC", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    --gray-500: #68675f;
+  }
+  body { font-size: 15.5px; line-height: 1.75; }
+  .page { max-width: 1680px; padding: 40px 24px 64px; }
+  h1 { font-size: clamp(30px, 4vw, 46px); letter-spacing: 0; }
+  h2 { margin: 0; font-size: 24px; }
+  .eyebrow { font-family: var(--sans); letter-spacing: 0; text-transform: none; }
+  .header-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-top: 18px; color: var(--gray-500); font-size: 13px; }
+  .toolbar { display: flex; width: 100%; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; padding: 12px 16px; border: var(--border); border-radius: 12px 12px 0 0; background: var(--paper); }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .btn { font-family: var(--sans); font-size: 13px; line-height: 1.4; border-radius: 7px; }
+  a.btn { display: inline-block; text-decoration: none; }
+  button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--clay); outline-offset: 3px; }
+  .map { margin: 0; border: var(--border); border-top: 0; border-radius: 0 0 12px 12px; overflow: hidden; background: var(--paper); }
+  .scroll { overflow: auto; overscroll-behavior-x: contain; }
+  .diagram { width: 100%; height: auto; min-width: 0; display: block; }
+  .scroll.fit .diagram { min-width: 0; }
+  .scroll.large .diagram { width: 1800px; min-width: 1800px; }
+  .diagram text { fill: var(--slate); }
+  .diagram .muted { fill: var(--gray-500); }
+  .diagram .http-text { fill: var(--olive); }
+  .diagram .cdp-text { fill: var(--clay-d); }
+  .diagram .http { stroke: var(--olive); }
+  .diagram .cdp { stroke: var(--clay-d); }
+  .diagram #arrow-http path { fill: var(--olive); }
+  .diagram #arrow-cdp path { fill: var(--clay-d); }
+  .diagram > rect:first-of-type { fill: var(--ivory); }
+  .diagram .boundary { fill: var(--gray-100); stroke: var(--gray-300); }
+  .diagram .node, .diagram .mask { fill: var(--paper); stroke: var(--gray-300); }
+  .diagram .component > rect { fill: var(--paper); }
+  .diagram [data-component="shared"] > rect { fill: var(--gray-100); }
+  .diagram .component { cursor: pointer; }
+  .diagram .component:hover > rect, .diagram .component:focus-visible > rect { stroke: var(--clay); stroke-width: 2.5px; }
+  .diagram .component[aria-pressed="true"] > rect { stroke: var(--clay); stroke-width: 2.5px; }
+  .map-caption { border-top: var(--border); padding: 10px 16px; font-size: 13px; color: var(--gray-500); }
+  .detail-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; margin-top: 24px; align-items: start; }
+  .content-stack { gap: 16px; }
+  .selection { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  select { min-width: 0; max-width: 100%; padding: 8px 12px; background: var(--paper); color: var(--slate); border: var(--border); border-radius: 7px; font: inherit; }
+  .tag { color: var(--clay-d); font-size: 13px; }
+  .source-list { list-style: none; padding: 0; display: grid; gap: 8px; font-size: 12px; }
+  .source-list a { font-family: var(--mono); overflow-wrap: anywhere; }
+  .boundary-notes { display: grid; gap: 12px; }
+  .note { padding-top: 12px; border-top: 1px solid var(--gray-300); }
+  .note strong { display: block; color: var(--slate); font-size: 15px; margin-bottom: 5px; }
+  .note p { font-size: 14px; }
+  .footer { color: var(--gray-500); font-size: 12px; margin-top: 24px; overflow-wrap: anywhere; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  @media (max-width: 880px) { .detail-grid { grid-template-columns: minmax(0, 1fr); } .page { padding: 28px 16px 48px; } .panel { padding: 18px; } .diagram { min-width: 1200px; } }
+  @media (prefers-color-scheme: dark) { :root { --gray-500: #b0afa6; --olive: #9fb783; --clay-d: #e6a18a; } .tag { color: var(--clay-d); } }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+  @media print {
+    @page { size: A3 landscape; margin: 14mm; }
+    :root { --ivory: #fff; --paper: #fff; --slate: #141413; --gray-100: #f0eee6; --gray-300: #d1cfc5; --gray-500: #68675f; --gray-700: #3d3d3a; }
+    .page { padding: 0; } .toolbar, .map-caption, .selection { display: none; }
+    .map { border: 0; } .scroll { overflow: visible; } .diagram, .scroll.large .diagram { width: 100%; min-width: 0; }
+    .detail-grid { grid-template-columns: 1fr 1fr; } .diagram .component[aria-pressed="true"] > rect { stroke-width: 1.5px; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <header>
+    <div class="eyebrow">mitojs/node · 组件与部署架构</div>
+    <h1>一套诊断内核，两类使用入口</h1>
+    <p>目标应用、Rust Agent 与诊断 CLI 分属三个进程边界。图中展示当前组件职责、代码归属及通信接口。</p>
+    <div class="header-meta"><span>代码快照：2026-10-23</span><span><code>dev @ 08bb018</code></span><span>单机部署 · 默认端口</span></div>
+  </header>
+  <section aria-label="当前架构图">
+    <div class="toolbar">
+      <span>点击图中组件，查看职责与源码</span>
+      <div class="actions">
+        <button class="btn secondary" id="fit" type="button" aria-pressed="false">适合宽度</button>
+        <button class="btn secondary" id="large" type="button" aria-pressed="false">原始大小</button>
+        <a class="btn secondary" href="assets/architecture/current.svg" download="mitojs-node-architecture.svg">下载 SVG</a>
+        <a class="btn secondary" href="assets/architecture/current.png" download="mitojs-node-architecture.png">下载 PNG</a>
+      </div>
+    </div>
+    <figure class="map">
+      <div class="scroll" id="diagram-scroll" tabindex="0" aria-label="架构图画布；窄屏可横向滚动"><svg class="diagram" xmlns="http://www.w3.org/2000/svg" width="1800" height="1260" viewBox="0 0 1800 1260" role="group" aria-labelledby="arch-title arch-desc">
+  <title id="arch-title">MitoJS Node 当前架构</title>
+  <desc id="arch-desc">组件与部署架构。目标 Node.js 应用内嵌 SDK，并提供独立的 Inspector 端点。SDK 通过 HTTP 向 Rust Agent 守护进程上报指标。诊断 CLI 内的人机 TUI 与机器 JSON 接口共用诊断内核，分别通过 AgentClient 和 InspectorSession 访问 Agent 与目标应用。共享包是 SDK 和 CLI 的代码依赖，诊断产物与历史保存在本地文件系统。</desc>
+  <defs>
+    <marker id="arrow" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#87867f"/></marker>
+    <marker id="arrow-http" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#637749"/></marker>
+    <marker id="arrow-cdp" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 9 4.5 0 9Z" fill="#b85c3e"/></marker>
+  </defs>
+  <style>
+    text{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;fill:#141413;font-size:20px}
+    .serif{font-family:Georgia,'Songti SC','Noto Serif CJK SC',serif}
+    .mono{font-family:Menlo,Consolas,monospace}
+    .muted{fill:#68675f}.small{font-size:17px}.tiny{font-size:15px}.label{font-size:19px;font-weight:600}.heading{font-size:25px;font-weight:600}
+    .boundary{fill:#f0eee6;stroke:#c6c3b8;stroke-width:1.5}.node{fill:white;stroke:#d1cfc5;stroke-width:1.5}.mask{fill:white;stroke:#d1cfc5;stroke-width:1}
+    .http-text{fill:#52643e}.cdp-text{fill:#b85c3e}
+    .edge{fill:none;stroke:#87867f;stroke-width:1.8;marker-end:url(#arrow)}
+    .http{fill:none;stroke:#637749;stroke-width:2.2;marker-end:url(#arrow-http)}
+    .cdp{fill:none;stroke:#b85c3e;stroke-width:2.4;marker-end:url(#arrow-cdp)}
+    .lifecycle{stroke-dasharray:7 6}.component{outline:none}
+  </style>
+  <rect width="1800" height="1260" fill="#faf9f5"/>
+  <text x="48" y="67" class="serif" style="font-size:42px">MitoJS Node · 当前架构</text>
+  <text x="48" y="109" class="muted" style="font-size:21px">进程边界、组件职责与接口依赖</text>
+  <text x="1752" y="65" text-anchor="end" class="mono small muted">mitojs/node · dev @ 08bb018</text>
+  <text x="1752" y="102" text-anchor="end" class="small muted">代码快照：2026-10-23 · 本机诊断架构</text>
+  <path d="M48 136H1752" stroke="#d1cfc5"/>
+
+  <!-- Runtime boundaries carry deployment meaning; library and storage ownership are separate below. -->
+  <rect x="48" y="244" width="488" height="672" rx="14" class="boundary"/>
+  <rect x="664" y="320" width="416" height="480" rx="14" class="boundary"/>
+  <rect x="1200" y="244" width="552" height="672" rx="14" class="boundary"/>
+  <rect x="72" y="228" width="252" height="34" rx="5" class="mask"/>
+  <text x="88" y="251" class="label">目标应用进程 · Node.js</text>
+  <rect x="688" y="304" width="300" height="34" rx="5" class="mask"/>
+  <text x="704" y="327" class="label">共享守护进程 · Rust Agent</text>
+
+  <!-- All connectors denote dependencies or interfaces, without temporal ordering. -->
+  <path d="M1348 220V324" class="edge"/>
+  <path d="M1604 220V324" class="edge"/>
+  <path d="M1348 452V500" class="edge"/>
+  <path d="M1604 452V500" class="edge"/>
+  <path d="M1348 692V740" class="edge"/>
+  <path d="M1604 692V740" class="edge"/>
+  <path d="M504 432H688" class="http"/>
+  <path d="M1232 800H1148V472H1056" class="http"/>
+  <path d="M872 508V560" class="edge"/>
+  <path d="M504 574H584V852H872V808" class="edge lifecycle"/>
+  <path d="M1604 856V968H292V900" class="cdp"/>
+  <path d="M1720 916V1028" class="edge"/>
+  <rect x="1224" y="228" width="308" height="34" rx="5" class="mask"/>
+  <text x="1240" y="251" class="label">诊断 CLI 进程 · mito-node</text>
+
+  <text x="1348" y="181" text-anchor="middle" class="heading">开发者</text>
+  <text x="1348" y="210" text-anchor="middle" class="small muted">终端交互</text>
+  <text x="1604" y="181" text-anchor="middle" class="heading">AI Agent / 自动化</text>
+  <text x="1604" y="210" text-anchor="middle" class="small muted">命令调用</text>
+  <text x="80" y="292" class="small muted">业务应用 · SDK 在目标主线程内运行</text>
+
+  <g class="component" data-component="sdk">
+    <rect x="80" y="332" width="424" height="284" rx="10" class="node"/>
+    <text x="104" y="374" class="mono heading">@mitojs/node</text>
+    <text x="104" y="414">MitoNode · 生命周期 / 配置</text>
+    <path d="M104 434H480" stroke="#e3dacc"/>
+    <text x="104" y="466" class="label">Collectors + RxJS Subjects</text>
+    <text x="104" y="501" class="small">CPU · Memory · JSError · Timeout</text>
+    <path d="M104 522H480" stroke="#e3dacc"/>
+    <text x="104" y="555" class="label">HTTP 上报 + Agent 二进制管理</text>
+    <text x="104" y="588" class="small muted">每类指标限制在途请求 · 心跳恢复注册</text>
+  </g>
+  <text x="80" y="654" class="small muted">错误 / 定时器依赖 SDK 的持续采集</text>
+  <g class="component" data-component="inspector">
+    <rect x="80" y="704" width="424" height="188" rx="10" class="node"/>
+    <text x="104" y="746" class="heading">Node.js Inspector</text>
+    <text x="104" y="782">Node / V8 内建调试端点 · 按需启用</text>
+    <text x="104" y="820" class="mono small muted">Runtime · Profiler · HeapProfiler</text>
+    <text x="104" y="864" class="small muted">Inspector 诊断能力可独立于 SDK 使用</text>
+  </g>
+
+  <g class="component" data-component="agent-api">
+    <rect x="696" y="376" width="352" height="132" rx="10" class="node"/>
+    <text x="720" y="416" style="font-size:23px;font-weight:600">HTTP API · axum / tokio</text>
+    <text x="720" y="452" class="mono">127.0.0.1:16666</text>
+    <text x="720" y="485" class="mono tiny muted">/info · /ipc/* · /metrics/*</text>
+  </g>
+  <g class="component" data-component="agent-store">
+    <rect x="696" y="568" width="352" height="156" rx="10" class="node"/>
+    <text x="720" y="608" style="font-size:23px;font-weight:600">进程指标内存存储</text>
+    <text x="720" y="643">按 PID 分区 · 4 类指标</text>
+    <text x="720" y="676" class="small">采样时间 / 间隔 / 截断计数</text>
+    <text x="720" y="707" class="small muted">100 条错误 · 1000 个当前定时器</text>
+  </g>
+  <text x="696" y="764" class="small muted">心跳过期清理 · 多个目标应用共享</text>
+
+  <g class="component" data-component="tui">
+    <rect x="1232" y="332" width="232" height="120" rx="10" class="node"/>
+    <text x="1252" y="373" class="heading">交互式 TUI</text>
+    <text x="1252" y="407" class="mono small">React / Ink</text>
+    <text x="1252" y="433" class="tiny muted">趋势图 / 键盘 / 行差异渲染</text>
+  </g>
+  <g class="component" data-component="cli">
+    <rect x="1488" y="332" width="232" height="120" rx="10" class="node"/>
+    <text x="1508" y="373" class="heading">结构化 CLI</text>
+    <text x="1508" y="407" class="mono small">Commander · --json</text>
+    <text x="1508" y="433" class="tiny muted">JSON 结果 / 错误码 / 退出码</text>
+  </g>
+  <g class="component" data-component="core">
+    <rect x="1232" y="508" width="488" height="184" rx="10" fill="#fff" stroke="#d97757" stroke-width="2"/>
+    <text x="1256" y="550" class="heading">共享诊断内核</text>
+    <text x="1256" y="586" class="mono" style="font-size:18px">executeDiagnostic + PluginRegistry</text>
+    <text x="1256" y="622" class="small">CPU / Heap / Report / 代码执行 / 组合诊断</text>
+    <text x="1256" y="660" class="small muted">超时与取消 · 会话清理 · 证据分析 · 历史</text>
+  </g>
+  <g class="component" data-component="agent-client">
+    <rect x="1232" y="748" width="232" height="108" rx="10" class="node"/>
+    <text x="1252" y="790" class="mono" style="font-size:21px;font-weight:600">AgentClient</text>
+    <text x="1252" y="825" class="small muted">身份校验 / 指标读取</text>
+  </g>
+  <g class="component" data-component="inspector-session">
+    <rect x="1488" y="748" width="232" height="108" rx="10" class="node"/>
+    <text x="1508" y="790" class="mono" style="font-size:19px;font-weight:600">InspectorSession</text>
+    <text x="1508" y="825" class="small muted">按需连接 / 所有权清理</text>
+  </g>
+  <text x="1232" y="892" class="small muted">两个入口共享插件、结果契约与诊断能力</text>
+
+  <!-- Opaque masks keep interface labels readable across the connector lines. -->
+  <rect x="522" y="401" width="156" height="62" rx="5" class="mask"/>
+  <text x="600" y="425" text-anchor="middle" class="small http-text">HTTP 上报</text>
+  <text x="600" y="449" text-anchor="middle" class="tiny muted">注册 / 心跳 / 指标</text>
+  <rect x="1088" y="592" width="120" height="58" rx="5" class="mask"/>
+  <text x="1148" y="615" text-anchor="middle" class="small http-text">HTTP 读取</text>
+  <text x="1148" y="638" text-anchor="middle" class="mono" style="font-size:12px">/metrics/:pid</text>
+  <rect x="838" y="520" width="68" height="28" rx="4" class="mask"/>
+  <text x="872" y="540" text-anchor="middle" class="tiny muted">读写</text>
+  <rect x="668" y="834" width="208" height="36" rx="5" class="mask"/>
+  <text x="772" y="858" text-anchor="middle" class="small">启动 / 复用 daemon</text>
+  <text x="668" y="895" class="small muted">Unix：fd3 · Windows：/info 就绪确认</text>
+  <rect x="542" y="948" width="650" height="40" rx="5" class="mask"/>
+  <text x="867" y="974" text-anchor="middle" class="cdp-text" style="font-size:18px">CDP / WebSocket · 按需诊断 · 默认 127.0.0.1:9229</text>
+  <rect x="1602" y="988" width="140" height="34" rx="5" class="mask"/>
+  <text x="1672" y="1011" text-anchor="middle" style="font-size:16px">产物 / 历史读写</text>
+
+  <g class="component" data-component="shared">
+    <rect x="48" y="1036" width="1032" height="160" rx="12" fill="#eeeadf" stroke="#c6c3b8" stroke-width="1.5" stroke-dasharray="7 5"/>
+    <text x="80" y="1080" class="mono" style="font-size:26px;font-weight:600">@mitojs/node-shared</text>
+    <text x="456" y="1080" style="font-size:21px">SDK / CLI 共同依赖的代码库</text>
+    <text x="80" y="1122">指标类型 · Subject / DataSource 常量 · CPU / Memory / Heap 采集 recipes</text>
+    <text x="80" y="1164" class="small muted">随 SDK / CLI 运行于调用方进程内</text>
+  </g>
+  <g class="component" data-component="filesystem">
+    <rect x="1200" y="1036" width="552" height="160" rx="12" class="node"/>
+    <text x="1224" y="1076" class="heading">本地文件系统</text>
+    <text x="1224" y="1112" class="mono small">.cpuprofile · .heapsnapshot · report JSON</text>
+    <text x="1224" y="1146">HistoryStore：用户数据目录</text>
+    <text x="1224" y="1178" class="small muted">最多 100 条 / 10 MiB；历史与产物分别管理</text>
+  </g>
+
+  <path d="M48 1232H94" stroke="#637749" stroke-width="2.2"/>
+  <text x="106" y="1238" class="small muted">HTTP 接口依赖</text>
+  <path d="M300 1232H346" stroke="#b85c3e" stroke-width="2.4"/>
+  <text x="358" y="1238" class="small muted">CDP 连接</text>
+  <path d="M522 1232H568" stroke="#87867f" stroke-width="1.8" stroke-dasharray="7 6"/>
+  <text x="580" y="1238" class="small muted">进程生命周期</text>
+  <text x="1752" y="1238" text-anchor="end" class="small muted">边界框表示运行归属 · 所有端口均为默认值</text>
+</svg>
+</div>
+      <figcaption class="map-caption">边界框表示组件的运行归属；箭头表示接口调用或依赖。窄屏可左右滚动，也可在下方选择组件查看文字说明。</figcaption>
+    </figure>
+  </section>
+  <div class="detail-grid">
+    <section class="panel content-stack" aria-labelledby="component-title">
+      <div class="selection"><label for="component">查看组件</label><select id="component"></select></div>
+      <div class="tag" id="component-tag"></div>
+      <h2 id="component-title">共享诊断内核</h2>
+      <p id="component-description"></p>
+      <ul class="source-list" id="component-sources" aria-label="对应源码文件"></ul>
+      <noscript>启用 JavaScript 可选择组件。完整架构仍可通过上方图形查看，SVG 与 PNG 可直接下载。</noscript>
+    </section>
+    <aside class="panel content-stack" aria-labelledby="boundaries-title">
+      <h2 id="boundaries-title">架构边界</h2>
+      <div class="boundary-notes">
+        <div class="note"><strong>人和 AI Agent 共用执行能力</strong><p>TUI 使用 React / Ink；机器接口由 Commander 提供结构化 JSON。二者共用执行器与插件，TUI 仅在交互模式加载。</p></div>
+        <div class="note"><strong>指标通道与诊断通道</strong><p>CPU / Memory 优先读取新鲜 Agent 指标，可回退 Inspector。Profile、Heap Snapshot、进程报告与代码执行使用 Inspector。错误和定时器依赖 SDK / Agent。</p></div>
+        <div class="note"><strong>内存指标与文件分别归属</strong><p>Rust Agent 的指标存储位于守护进程内存。CLI 管理文件产物和持久化历史。Shared 包是 SDK / CLI 的进程内代码依赖。</p></div>
+      </div>
+    </aside>
+  </div>
+  <footer class="footer">核对范围：packages/node、packages/node-cli、packages/shared、agent。源码链接固定到提交 08bb018d905060563dbe324442b32feb79d3f03a。<a href="../README.md">项目 README</a></footer>
+</main>
+<script>
+const components = {"core": {"title": "共享诊断内核", "tag": "统一执行边界", "description": "TUI 和结构化 CLI 调用同一个 executeDiagnostic，通过 PluginRegistry 选择诊断插件。执行器负责参数校验、总超时、取消、会话清理和历史记录；插件与 diagnosis 服务提供具体采集和证据分析。", "files": ["packages/node-cli/src/services/diagnostic-runner.ts", "packages/node-cli/src/core/registry.ts", "packages/node-cli/src/plugins/index.ts", "packages/node-cli/src/services/diagnosis.ts"]}, "sdk": {"title": "应用内 SDK", "tag": "@mitojs/node", "description": "MitoNode 在目标应用主线程管理 CPU、Memory、JSError、Timeout 的 Collector / RxJS Subject，直接以 HTTP 上报到本地 Agent。binary.ts 按平台启动或复用 Agent；client.ts 管理注册、30 秒心跳、恢复与注销。", "files": ["packages/node/src/client.ts", "packages/node/src/binary.ts", "packages/node/src/request.ts", "packages/node/src/collector/base.ts", "packages/node/src/subjects/base.ts"]}, "inspector": {"title": "目标进程的 Inspector", "tag": "Node.js / V8 内建能力", "description": "Inspector 属于目标 Node.js 进程，独立于 SDK。CLI 通过 HTTP 发现端点并用 CDP WebSocket 访问 Runtime、Profiler、HeapProfiler。Unix 可由 CLI 按需通过 SIGUSR1 激活；Windows 要预先用 --inspect 启用。", "files": ["packages/node-cli/src/services/inspector-session.ts", "packages/node-cli/src/plugins/cpu-profile.ts", "packages/node-cli/src/plugins/heap-snapshot.ts"]}, "agent-api": {"title": "Rust Agent HTTP 服务", "tag": "axum / tokio", "description": "本机共享守护进程默认监听 127.0.0.1:16666。API 提供身份与协议校验、进程注册 / 注销、心跳、指标写入和按 PID 查询。SDK 的自动启动配置固定为回环地址，Agent 本身也校验监听地址。", "files": ["agent/src/ipc/http/http.rs", "agent/src/ipc/http/endpoints/info.rs", "agent/src/ipc/http/endpoints/metrics.rs", "agent/src/helper/config.rs"]}, "agent-store": {"title": "进程指标内存存储", "tag": "Rust 进程内 HashMap / Mutex", "description": "Store 按 PID 保存四类指标、注册采集项、各类指标的采样时间、间隔和截断数。最多保存 100 条错误、1000 个当前定时器。每 60 秒清理超过 300 秒未心跳的注册；SDK 自动创建的 Agent 在无注册进程后空闲 30 秒退出。手动启动的 Agent 持续运行。", "files": ["agent/src/data_processor/store.rs", "agent/src/ipc/http/endpoints/register_process.rs", "agent/src/main.rs"]}, "tui": {"title": "面向人的交互式 TUI", "tag": "React / Ink", "description": "独立交互入口按需加载 Ink。TuiController 管理进程选择、轮询、任务、参数和取消；视图呈现页签、CPU / RSS / Heap 趋势及诊断产物。terminal.ts 用行差异更新输出。被动采样通过共享执行器完成，且不写入诊断历史。", "files": ["packages/node-cli/src/interactive-cli.tsx", "packages/node-cli/src/tui/controller.ts", "packages/node-cli/src/tui/app.tsx", "packages/node-cli/src/tui/trend.ts", "packages/node-cli/src/tui/terminal.ts"]}, "cli": {"title": "面向 AI Agent 的结构化 CLI", "tag": "Commander / --json", "description": "bin.ts 将注册插件暴露为子命令，--json 输出结构化结果；输出格式器、错误码和进程退出码为自动化调用提供稳定边界。机器命令路径不会加载交互界面。这里的 AI Agent 是调用者，与 Rust Agent 守护进程分别标注。", "files": ["packages/node-cli/src/bin.ts", "packages/node-cli/src/core/types.ts", "packages/node-cli/src/services/output-formatter.ts"]}, "agent-client": {"title": "Agent 指标访问适配器", "tag": "AgentClient + readAgentMetrics", "description": "AgentClient 以 HTTP 校验 /info 身份并读取 /metrics/:pid。helper.ts 的 readAgentMetrics 校验采集项是否注册、采样时间及间隔；CPU / Memory 插件优先采用新鲜 Agent 指标。Errors / Timers 缺少有效 SDK 数据时返回 SDK_REQUIRED。", "files": ["packages/node-cli/src/services/agent-client.ts", "packages/node-cli/src/helper.ts", "packages/node-cli/src/plugins/monitor-cpu.ts", "packages/node-cli/src/plugins/memory.ts", "packages/node-cli/src/plugins/errors.ts", "packages/node-cli/src/plugins/timers.ts"]}, "inspector-session": {"title": "Inspector 连接适配器", "tag": "InspectorSession", "description": "管理本机端点发现、连接、目标 PID 校验、CDP 请求和取消。CPU / Memory 可通过 Inspector 回退采集；CPU Profile、Heap Snapshot、进程报告和代码执行直接使用此通道。清理只关闭本次拥有的 Inspector，并保留预先存在的调试器。", "files": ["packages/node-cli/src/services/inspector-session.ts", "packages/node-cli/src/helper.ts", "packages/node-cli/src/plugins/cpu-profile.ts", "packages/node-cli/src/plugins/report.ts", "packages/node-cli/src/plugins/run-code.ts"]}, "shared": {"title": "SDK / CLI 共享代码库", "tag": "@mitojs/node-shared", "description": "共享指标类型、Subject / DataSource 常量，以及 CPU、内存与 Heap Snapshot 的采集 recipes。它作为包依赖在 SDK / CLI 调用方进程内使用。SDK 与 CLI 的 package.json 均声明此依赖。", "files": ["packages/shared/src/index.ts", "packages/shared/src/types/metrics.ts", "packages/shared/src/recipes/index.ts", "packages/node/package.json", "packages/node-cli/package.json"]}, "filesystem": {"title": "CLI 管理的本地文件", "tag": "诊断产物 + HistoryStore", "description": "CPU Profile、Heap Snapshot、进程报告等产物写入指定目录，普通文件命令未指定目录时使用系统临时目录。HistoryStore 默认写入用户数据目录，保留最多 100 条 / 10 MiB 的诊断记录。修剪历史不会删除产物文件。", "files": ["packages/node-cli/src/services/history.ts", "packages/node-cli/src/helper.ts", "packages/node-cli/src/plugins/cpu-profile.ts", "packages/node-cli/src/plugins/heap-snapshot.ts", "packages/node-cli/src/plugins/report.ts"]}}
+const selector = document.getElementById('component')
+const groups = document.querySelectorAll('[data-component]')
+const sourceRoot = 'https://github.com/mitojs/node/blob/08bb018d905060563dbe324442b32feb79d3f03a/'
+for (const [key, component] of Object.entries(components)) {
+  const option = document.createElement('option')
+  option.value = key
+  option.textContent = component.title
+  selector.append(option)
+}
+function selectComponent(key) {
+  const component = components[key]
+  if (!component) return
+  selector.value = key
+  document.getElementById('component-title').textContent = component.title
+  document.getElementById('component-tag').textContent = component.tag
+  document.getElementById('component-description').textContent = component.description
+  const sources = document.getElementById('component-sources')
+  sources.replaceChildren()
+  for (const file of component.files) {
+    const li = document.createElement('li')
+    const link = document.createElement('a')
+    link.href = sourceRoot + file
+    link.textContent = file
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    li.append(link)
+    sources.append(li)
+  }
+  groups.forEach(group => group.setAttribute('aria-pressed', String(group.dataset.component === key)))
+}
+groups.forEach(group => {
+  const key = group.dataset.component
+  group.setAttribute('tabindex', '0')
+  group.setAttribute('role', 'button')
+  group.setAttribute('aria-label', '查看' + components[key].title)
+  group.addEventListener('click', () => selectComponent(key))
+  group.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      selectComponent(key)
+    }
+  })
+})
+selector.addEventListener('change', () => selectComponent(selector.value))
+const scroll = document.getElementById('diagram-scroll')
+for (const mode of ['fit', 'large']) {
+  document.getElementById(mode).addEventListener('click', () => {
+    scroll.className = 'scroll ' + mode
+    document.getElementById('fit').setAttribute('aria-pressed', String(mode === 'fit'))
+    document.getElementById('large').setAttribute('aria-pressed', String(mode === 'large'))
+  })
+}
+selectComponent('core')
+</script>
+</body>
+</html>

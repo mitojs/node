@@ -9,8 +9,8 @@ export interface ConfigType {
 
 export interface RegisterProcessData {
 	pid: number
-	udsPath: string
 	subjects: string[]
+	intervals?: Record<string, number>
 }
 
 export interface IpcMessage {

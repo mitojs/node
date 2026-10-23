@@ -38,6 +38,9 @@ struct MetricsResponse {
     success: bool,
     data: Option<ProcessMetrics>,
     registered_subjects: Vec<String>,
+    updated_at: std::collections::HashMap<String, u64>,
+    intervals: std::collections::HashMap<String, u64>,
+    truncated: crate::data_processor::store::TruncatedMetrics,
 }
 
 async fn get_metrics(Path(pid): Path<u32>) -> ResponseJson<MetricsResponse> {
@@ -47,7 +50,12 @@ async fn get_metrics(Path(pid): Path<u32>) -> ResponseJson<MetricsResponse> {
     ResponseJson(MetricsResponse {
         success: store.is_some(),
         data: store.map(|s| s.metrics.clone()),
-        registered_subjects: store.map(|s| s.registered_subjects.clone()).unwrap_or_default(),
+        registered_subjects: store
+            .map(|s| s.registered_subjects.clone())
+            .unwrap_or_default(),
+        updated_at: store.map(|s| s.updated_at.clone()).unwrap_or_default(),
+        intervals: store.map(|s| s.intervals.clone()).unwrap_or_default(),
+        truncated: store.map(|s| s.truncated.clone()).unwrap_or_default(),
     })
 }
 
@@ -76,12 +84,28 @@ struct PushMetricsRequest {
     pid: u32,
     subject: String,
     data: serde_json::Value,
+    #[serde(default)]
+    truncated: crate::data_processor::store::TruncatedMetrics,
 }
 
 async fn push_metrics(
     Json(payload): Json<PushMetricsRequest>,
 ) -> Result<ResponseJson<serde_json::Value>, StatusCode> {
-    log_print!("/metrics/push pid={} subject={}", payload.pid, payload.subject);
-    PROCESS_MAP_STORE.update_metrics(&payload.pid, &payload.subject, payload.data);
+    log_print!(
+        "/metrics/push pid={} subject={}",
+        payload.pid,
+        payload.subject
+    );
+    if PROCESS_MAP_STORE.get(&payload.pid).is_none() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if !PROCESS_MAP_STORE.update_metrics(&payload.pid, &payload.subject, payload.data) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if payload.subject == "Timeout" || payload.subject == "timeout" {
+        if let Some(store) = PROCESS_MAP_STORE.get_data().get_mut(&payload.pid) {
+            store.truncated.timers += payload.truncated.timers;
+        }
+    }
     Ok(ResponseJson(serde_json::json!({"success": true})))
 }

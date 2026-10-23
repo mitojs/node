@@ -17,12 +17,15 @@ pub struct InfoResponse {
     pub name: String,
     pub version: String,
     pub status: String,
+    pub protocol_version: u32,
+    pub pid: u32,
 }
 
 #[derive(Deserialize)]
 pub struct UpdateProcessRequest {
     pub process_id: u32,
     pub action: String,
+    #[allow(dead_code)]
     pub data: Option<serde_json::Value>,
 }
 

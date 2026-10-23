@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TimeoutCollector } from '../../collector/timeout'
+import { wrap } from '../../shared/shimmer'
 
 describe('TimeoutCollector', () => {
 	afterEach(() => {
@@ -49,4 +50,39 @@ describe('TimeoutCollector', () => {
 			clearInterval(time2)
 		})
 	})
+})
+
+describe('timer wrapper ownership', () => {
+	it.each(['setTimeout', 'setInterval'] as const)(
+		'preserves a later third-party %s wrapper and stops SDK recording after destroy',
+		(name) => {
+			const originalTimeout = global.setTimeout
+			const originalInterval = global.setInterval
+			const collector = new TimeoutCollector()
+			let calls = 0
+			let timer: NodeJS.Timeout | undefined
+			wrap(
+				global,
+				name,
+				(original) =>
+					function (this: unknown, ...args: Parameters<typeof setTimeout>) {
+						calls++
+						return original.apply(this, args)
+					} as typeof setTimeout
+			)
+			const thirdParty = global[name]
+			try {
+				collector.destroy()
+				expect(global[name]).toBe(thirdParty)
+				timer = global[name](() => {}, 60000)
+				expect(calls).toBe(1)
+				expect(collector.get().size).toBe(0)
+			} finally {
+				if (timer) clearTimeout(timer)
+				collector.destroy()
+				global.setTimeout = originalTimeout
+				global.setInterval = originalInterval
+			}
+		}
+	)
 })

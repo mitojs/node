@@ -15,7 +15,12 @@ use crate::{error_print, log_print};
 use super::{
     common::BaseRouter,
     endpoints::{
-        heartbeat::HEARTBEAT_ROUTER, info::INFO_ROUTER, metrics::{METRICS_ROUTER, METRICS_PUSH_ROUTER}, register_process::REGISTER_PROCESS_ROUTER, update_process::UPDATE_PROCESS_ROUTER,
+        heartbeat::HEARTBEAT_ROUTER,
+        info::INFO_ROUTER,
+        metrics::{METRICS_PUSH_ROUTER, METRICS_ROUTER},
+        register_process::REGISTER_PROCESS_ROUTER,
+        unregister_process::UNREGISTER_PROCESS_ROUTER,
+        update_process::UPDATE_PROCESS_ROUTER,
     },
 };
 
@@ -33,7 +38,15 @@ pub async fn setup_http_server(
         .route("/", get(get_agent_name))
         .layer(CorsLayer::permissive()); // CORS 支持
 
-    const ROUTERS: [&dyn BaseRouter; 6] = [&INFO_ROUTER, &UPDATE_PROCESS_ROUTER, &HEARTBEAT_ROUTER, &METRICS_ROUTER, &METRICS_PUSH_ROUTER, &REGISTER_PROCESS_ROUTER];
+    const ROUTERS: [&dyn BaseRouter; 7] = [
+        &INFO_ROUTER,
+        &UPDATE_PROCESS_ROUTER,
+        &HEARTBEAT_ROUTER,
+        &METRICS_ROUTER,
+        &METRICS_PUSH_ROUTER,
+        &REGISTER_PROCESS_ROUTER,
+        &UNREGISTER_PROCESS_ROUTER,
+    ];
     for router in ROUTERS {
         app = app.route(router.get_path(), (router.get_handler())());
     }
@@ -78,27 +91,29 @@ fn classify_server_error(error: &Box<dyn std::error::Error + Send + Sync>) -> Li
     }
 }
 
-pub async fn start_http_server(config: AppConfig) {
-    tokio::spawn(async move {
-        match setup_http_server(&config.tcp.host, config.tcp.port).await {
-            Ok(()) => {
-                log_print!("HTTP 服务器启动成功");
-                let message = IpcMessage {
-                    code: IpcMessageCode::Ok,
-                    message: ListenerResultType::Success.to_string(),
-                };
-                send_ipc_message(message);
-            }
-            Err(e) => {
-                error_print!("HTTP 服务器启动失败: {}", e);
-                let message = IpcMessage {
-                    code: IpcMessageCode::Err,
-                    message: classify_server_error(&e).to_string(),
-                };
-                send_ipc_message(message);
-            }
+pub async fn start_http_server(
+    config: AppConfig,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    match setup_http_server(&config.tcp.host, config.tcp.port).await {
+        Ok(()) => {
+            log_print!("HTTP 服务器启动成功");
+            let message = IpcMessage {
+                code: IpcMessageCode::Ok,
+                message: ListenerResultType::Success.to_string(),
+            };
+            send_ipc_message(message);
+            Ok(())
         }
-    });
+        Err(e) => {
+            error_print!("HTTP 服务器启动失败: {}", e);
+            let message = IpcMessage {
+                code: IpcMessageCode::Err,
+                message: classify_server_error(&e).to_string(),
+            };
+            send_ipc_message(message);
+            Err(e)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -124,16 +139,14 @@ mod tests {
 
     #[test]
     fn test_classify_non_io_error_with_keyword() {
-        let err: Box<dyn std::error::Error + Send + Sync> =
-            "Address already in use".into();
+        let err: Box<dyn std::error::Error + Send + Sync> = "Address already in use".into();
         let result = classify_server_error(&err);
         assert!(matches!(result, ListenerResultType::AddrInUse));
     }
 
     #[test]
     fn test_classify_generic_error() {
-        let err: Box<dyn std::error::Error + Send + Sync> =
-            "some random error".into();
+        let err: Box<dyn std::error::Error + Send + Sync> = "some random error".into();
         let result = classify_server_error(&err);
         assert!(matches!(result, ListenerResultType::FailedReason(_)));
     }

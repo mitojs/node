@@ -40,7 +40,7 @@ describe('JSErrorCollector', () => {
 			collector.subscribe(subscriber)
 			const error = new Error('Test error')
 
-			process.emit('uncaughtException', error)
+			process.emit('uncaughtExceptionMonitor', error)
 
 			expect(subscriber).toHaveBeenCalledWith(error)
 			expect(subscriber).toHaveBeenCalledTimes(1)
@@ -53,7 +53,7 @@ describe('JSErrorCollector', () => {
 			collector.subscribe([subscriber1, subscriber2])
 			const error = new Error('Test error')
 
-			process.emit('uncaughtException', error)
+			process.emit('uncaughtExceptionMonitor', error)
 
 			expect(subscriber1).toHaveBeenCalledWith(error)
 			expect(subscriber2).toHaveBeenCalledWith(error)
@@ -66,7 +66,7 @@ describe('JSErrorCollector', () => {
 			const subscriber = vi.fn()
 			collector.subscribe(subscriber)
 			const error = new Error('Test error')
-			process.emit('uncaughtException', error)
+			process.emit('uncaughtExceptionMonitor', error)
 			expect(subscriber).toHaveBeenCalledWith(error)
 			expect(collector['_subscribers']).toHaveLength(1)
 			expect(collector['_teardown']).toHaveLength(1)
@@ -79,7 +79,7 @@ describe('JSErrorCollector', () => {
 			// 添加临时监听器防止 Vitest 捕获 uncaughtException
 			const noop = () => {}
 			process.on('uncaughtException', noop)
-			process.emit('uncaughtException', error)
+			process.emit('uncaughtExceptionMonitor', error)
 			process.off('uncaughtException', noop)
 
 			expect(collector['_subscribers']).toHaveLength(0)

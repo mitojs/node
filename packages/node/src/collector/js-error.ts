@@ -19,11 +19,10 @@ export class JsErrorCollector extends BaseCollector<Error> {
 
 	protected listen() {
 		const boundHandleError = this.handleError.bind(this)
-		process.on('uncaughtException', boundHandleError)
-		process.on('unhandledRejection', boundHandleError)
+		// Monitor 不改变 Node 对致命异常和未处理拒绝的默认退出语义。
+		process.on('uncaughtExceptionMonitor', boundHandleError)
 		return () => {
-			process.off('uncaughtException', boundHandleError)
-			process.off('unhandledRejection', boundHandleError)
+			process.off('uncaughtExceptionMonitor', boundHandleError)
 		}
 	}
 
