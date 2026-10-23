@@ -16,8 +16,9 @@ cargo test --locked --manifest-path agent/Cargo.toml
 
 | 检查 | 已通过的用例 |
 | --- | ---: |
-| TypeScript 包内单测 | 279（shared 19 / SDK 49 / CLI 211） |
+| TypeScript 包内单测 | 280（shared 19 / SDK 49 / CLI 212） |
 | 构建与包装工具测试 | 11 |
+| Agent 构建脚本与入口测试 | 5 |
 | Rust Agent | 81 |
 | 构建 CLI E2E | 20 |
 

@@ -192,6 +192,7 @@ describe('diagnostic history', () => {
 				nested: { filename: '/tmp/a.heapsnapshot' },
 			})
 		).toEqual(['/tmp/a.heapsnapshot', '/tmp/b.cpuprofile'])
-		expect(resolveHistoryDirectory('/tmp/explicit')).toBe('/tmp/explicit')
+		const explicit = join(tmpdir(), 'mito-explicit-history')
+		expect(resolveHistoryDirectory(explicit)).toBe(explicit)
 	})
 })

@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import * as osModule from 'node:os'
 import { tmpdir } from 'node:os'
@@ -24,10 +24,11 @@ async function endpoint(info: unknown) {
 }
 function fixture(source: string) {
 	dir = mkdtempSync(join(tmpdir(), 'mito-agent-startup-'))
-	const file = join(dir, 'fixture-agent')
-	writeFileSync(file, `#!${process.execPath}\n${source}`)
-	chmodSync(file, 0o755)
-	process.env.MITO_AGENT_BINARY_PATH = file
+	const file = join(dir, 'fixture-agent.cjs')
+	writeFileSync(file, source)
+	// Windows 不执行 Unix shebang；显式启动 Node，仍使用真实子进程验证启动协议。
+	process.env.MITO_AGENT_BINARY_PATH = process.execPath
+	return [file]
 }
 afterEach(async () => {
 	await agent?.stop()
@@ -59,9 +60,9 @@ describe('verified local Agent startup', () => {
 	})
 	it('rejects startup IPC errors instead of treating them as readiness', async () => {
 		configMap.update({ agentHost: '127.0.0.1', agentTCPPort: 61341 })
-		fixture("process.send({code:500,message:'permission_denied'});setInterval(()=>{},1000)")
+		const args = fixture("process.send({code:500,message:'permission_denied'});setInterval(()=>{},1000)")
 		agent = new MitojsAgent()
-		await expect(agent.start()).rejects.toThrow(/permission_denied|startup/i)
+		await expect(agent.start(args)).rejects.toThrow(/permission_denied/)
 	})
 	it('verifies HTTP readiness on Windows where Rust cannot write Node IPC fd3', async () => {
 		const reservation = createServer()
@@ -69,25 +70,25 @@ describe('verified local Agent startup', () => {
 		const port = (reservation.address() as { port: number }).port
 		await new Promise<void>((resolve) => reservation.close(() => resolve()))
 		configMap.update({ agentHost: '127.0.0.1', agentTCPPort: port })
-		fixture(
+		const args = fixture(
 			"require('node:http').createServer((req,res)=>{res.setHeader('content-type','application/json');res.end(JSON.stringify({name:'mitojs-agent',version:'0.1.0',status:'running',protocol_version:1,pid:process.pid}))}).listen(Number(process.env.MITO_AGENT_TCP_PORT),'127.0.0.1')"
 		)
 		vi.mocked(osModule.platform).mockReturnValue('win32')
 		agent = new MitojsAgent()
 		// 本例验证 HTTP 就绪协议而非启动速度；使用生产默认预算，避免并行负载下的子进程调度导致误报。
-		await expect(agent.start()).resolves.toBeUndefined()
+		await expect(agent.start(args)).resolves.toBeUndefined()
 		expect(agent.getPid()).toBeGreaterThan(0)
 	})
 	it('rejects a child that exits before readiness', async () => {
 		configMap.update({ agentHost: '127.0.0.1', agentTCPPort: 61342 })
-		fixture('process.exit(7)')
+		const args = fixture('process.exit(7)')
 		agent = new MitojsAgent()
-		await expect(agent.start()).rejects.toThrow(/7|exit/i)
+		await expect(agent.start(args)).rejects.toThrow(/7|exit/i)
 	})
 	it('bounds startup waiting when the child never announces readiness', async () => {
 		configMap.update({ agentHost: '127.0.0.1', agentTCPPort: 61343 })
-		fixture('setInterval(()=>{},1000)')
+		const args = fixture('setInterval(()=>{},1000)')
 		agent = new MitojsAgent()
-		await expect(agent.start([], 100)).rejects.toThrow(/timeout/i)
+		await expect(agent.start(args, 100)).rejects.toThrow(/timeout/i)
 	})
 })
